@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:map": "node scripts/build-world-map.mjs"
+    "build:map": "node scripts/build-world-map.mjs",
+    "build:countries": "node scripts/build-countries.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -24,13 +25,17 @@
     "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/ui": "^5.0.0",
+    "all-the-cities": "^3.1.0",
+    "country-flag-icons": "^1.6.20",
     "jsdom": "^30.0.1",
     "oxlint": "^1.81.0",
+    "pbf": "^5.1.2",
     "tailwindcss": "^4.3.3",
     "topojson-client": "^3.1.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0",
-    "world-atlas": "^2.0.2"
+    "world-atlas": "^2.0.2",
+    "world-countries": "^5.1.0"
   }
 }

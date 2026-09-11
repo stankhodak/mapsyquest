@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
-import { flagEmoji } from '../lib/flags';
+import { flagImageUrl } from '../lib/flags';
 
 export interface FlagGuessResult {
   guess: string;
@@ -72,10 +72,10 @@ export function FlagStep({ answer, onComplete }: FlagStepProps) {
               type="button"
               disabled={isRevealed}
               onClick={() => submit(c.id)}
-              className={`flex h-16 items-center justify-center rounded-lg border text-3xl transition ${stateClasses}`}
+              className={`flex h-16 items-center justify-center overflow-hidden rounded-lg border p-1 transition ${stateClasses}`}
               aria-label={isRevealed ? c.name : 'flag option'}
             >
-              {flagEmoji(c.id)}
+              <img src={flagImageUrl(c.id)} alt="" className="h-full w-full rounded object-cover" />
             </button>
           );
         })}
