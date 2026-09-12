@@ -19,7 +19,7 @@ const MIN_QUERY_LENGTH = 3;
 const MAX_SUGGESTIONS = 8;
 const MAX_TRIES = 3;
 /** Matches MapScope's red-flash duration, so the input unlocks right as the flash fades. */
-const RETRY_DELAY_MS = 700;
+const RETRY_DELAY_MS = 900;
 
 export function CountryStep({ answer, onComplete }: CountryStepProps) {
   const [query, setQuery] = useState('');
@@ -58,14 +58,29 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
         setTryNumber((t) => t + 1);
         setQuery('');
         setLocked(false);
+        setFeedback(null);
       }, RETRY_DELAY_MS);
     }
   }
 
+  function skip() {
+    if (locked) return;
+    onComplete({ guess: '(skipped)', isCorrect: false, score: 0 });
+  }
+
+  const onFinalTry = tryNumber >= MAX_TRIES;
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-medium text-slate-100">Which country is this?</h2>
-      <MapScope center={answer.center} zoom={answer.mapZoom} flashSignal={flashSignal} />
+      <MapScope
+        center={answer.center}
+        zoom={answer.mapZoom}
+        countryId={answer.id}
+        revealOutline={onFinalTry}
+        fitToOutline={onFinalTry}
+        flashSignal={flashSignal}
+      />
       <div className="relative">
         <input
           autoFocus
@@ -98,15 +113,27 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
         )}
       </div>
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-slate-400">{feedback ?? `Attempt ${tryNumber} of ${MAX_TRIES}`}</p>
-        <button
-          type="button"
-          onClick={() => submit(query)}
-          disabled={!trimmed || locked}
-          className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
-        >
-          Guess
-        </button>
+        <p className="text-xs text-slate-400">
+          {feedback ?? (onFinalTry ? 'Last try — outline revealed on the map' : `Attempt ${tryNumber} of ${MAX_TRIES}`)}
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={skip}
+            disabled={locked}
+            className="rounded-lg border border-rose-700 px-3 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            onClick={() => submit(query)}
+            disabled={!trimmed || locked}
+            className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
+          >
+            Guess
+          </button>
+        </div>
       </div>
     </div>
   );

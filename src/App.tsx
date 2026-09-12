@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { RoundFlow, type RoundResult } from './components/RoundFlow';
+import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
 import {
   clearDailyRecord,
@@ -17,9 +18,20 @@ interface SummaryRow {
   points: number;
 }
 
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 function App() {
-  const dateKey = useMemo(() => todayKey(), []);
-  const dailyCountries = useMemo(() => getDailyCountries(dateKey), [dateKey]);
+  const [dateKey] = useState(() => todayKey());
+  // The daily set is deterministic (same 7 countries for everyone, each date), but
+  // the play ORDER reshuffles on Reset purely for replay/testing convenience.
+  const [playOrder, setPlayOrder] = useState<Country[]>(() => getDailyCountries(dateKey));
 
   const [storedRecord, setStoredRecord] = useState<StoredDailyRecord | null>(() =>
     loadDailyRecord(dateKey),
@@ -33,12 +45,12 @@ function App() {
   // Day-locked: today's game was already completed (possibly in an earlier
   // visit), so skip straight to the results already on record instead of
   // letting the player replay.
-  const isGameOver = storedRecord !== null || roundIndex >= dailyCountries.length;
+  const isGameOver = storedRecord !== null || roundIndex >= playOrder.length;
 
   function handleRoundComplete(result: RoundResult) {
     setResults((prev) => {
       const next = [...prev, result];
-      if (next.length === dailyCountries.length) {
+      if (next.length === playOrder.length) {
         const record: StoredDailyRecord = {
           date: dateKey,
           results: next.map((r) => ({
@@ -58,12 +70,13 @@ function App() {
     setRoundIndex((prev) => prev + 1);
   }
 
-  /** Technical/testing helper: wipes today's progress so the day can be replayed. */
+  /** Restarts the game: clears today's progress and reshuffles the round order. */
   function handleReset() {
     clearDailyRecord(dateKey);
     setStoredRecord(null);
     setResults([]);
     setRoundIndex(0);
+    setPlayOrder(shuffle(getDailyCountries(dateKey)));
     setResetCount((n) => n + 1);
   }
 
@@ -88,12 +101,11 @@ function App() {
       <main>
         {!isGameOver && (
           <RoundFlow
-            key={`${resetCount}-${dailyCountries[roundIndex].id}`}
-            country={dailyCountries[roundIndex]}
+            key={`${resetCount}-${playOrder[roundIndex].id}`}
+            country={playOrder[roundIndex]}
             roundNumber={roundIndex + 1}
-            totalRounds={dailyCountries.length}
+            totalRounds={playOrder.length}
             onRoundComplete={handleRoundComplete}
-            onReset={handleReset}
           />
         )}
 
@@ -106,7 +118,7 @@ function App() {
               </p>
             )}
             <p className="text-lg">
-              {totalStars} / {dailyCountries.length * 3} stars &middot; {totalPoints} points
+              {totalStars} / {playOrder.length * 3} stars &middot; {totalPoints} points
             </p>
             <ul className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 text-left text-sm text-slate-300">
               {summaryRows.map((r) => (
@@ -118,6 +130,13 @@ function App() {
               ))}
             </ul>
             <p className="text-xs text-slate-500">Come back tomorrow for a new set of countries.</p>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+            >
+              Reset
+            </button>
           </div>
         )}
       </main>

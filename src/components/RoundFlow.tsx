@@ -19,13 +19,11 @@ interface RoundFlowProps {
   roundNumber: number;
   totalRounds: number;
   onRoundComplete: (result: RoundResult) => void;
-  /** Technical/testing reset: wipes today's progress so the day can be replayed. */
-  onReset: () => void;
 }
 
 type Step = 'country' | 'capital' | 'flag' | 'summary';
 
-export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete, onReset }: RoundFlowProps) {
+export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }: RoundFlowProps) {
   const [step, setStep] = useState<Step>('country');
   const [countryGuess, setCountryGuess] = useState<CountryGuessResult | null>(null);
   const [capitalGuess, setCapitalGuess] = useState<CapitalGuessResult | null>(null);
@@ -91,22 +89,13 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete, 
           <p className="text-base font-semibold text-slate-100">
             {stars} {stars === 1 ? 'star' : 'stars'} · {roundPoints} points ({multiplier}x)
           </p>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={finishRound}
-              className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white"
-            >
-              {roundNumber < totalRounds ? 'Next round' : 'See results'}
-            </button>
-            <button
-              type="button"
-              onClick={onReset}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 hover:bg-slate-800"
-            >
-              Reset (dev)
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={finishRound}
+            className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white"
+          >
+            {roundNumber < totalRounds ? 'Next round' : 'See results'}
+          </button>
         </div>
       )}
     </div>

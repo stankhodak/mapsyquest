@@ -41,10 +41,21 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
     setValue('');
   }
 
+  function skip() {
+    onComplete({ guess: '(skipped)', score: 0, isStar: false });
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-medium text-slate-100">What's the capital of {answer.name}?</h2>
-      <MapScope center={answer.capitalCoords} zoom={answer.mapZoom + 1} />
+      <MapScope
+        center={answer.capitalCoords}
+        zoom={answer.mapZoom + 1}
+        countryId={answer.id}
+        countryName={answer.name}
+        revealOutline
+        revealName
+      />
       <input
         autoFocus
         value={value}
@@ -60,14 +71,23 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
       />
       <div className="flex items-center justify-between gap-4">
         <p className="text-xs text-slate-400">{feedback ?? `Attempt ${tryNumber} of ${MAX_TRIES}`}</p>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!value.trim()}
-          className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
-        >
-          Guess
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={skip}
+            className="rounded-lg border border-rose-700 px-3 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950"
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!value.trim()}
+            className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
+          >
+            Guess
+          </button>
+        </div>
       </div>
     </div>
   );
