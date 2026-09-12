@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tryFraction } from '../lib/points';
-import { FeedbackBadge, type FeedbackTone } from './Badge';
+import { AttemptBadge, FeedbackBadge, QuestionHeading, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CountryGuessResult {
@@ -14,7 +14,6 @@ export interface CountryGuessResult {
 interface CountryStepProps {
   answer: Country;
   onComplete: (result: CountryGuessResult) => void;
-  onAttemptChange?: (current: number, max: number) => void;
 }
 
 const MIN_QUERY_LENGTH = 3;
@@ -28,18 +27,13 @@ interface Feedback {
   label: string;
 }
 
-export function CountryStep({ answer, onComplete, onAttemptChange }: CountryStepProps) {
+export function CountryStep({ answer, onComplete }: CountryStepProps) {
   const [query, setQuery] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
   const [flashSignal, setFlashSignal] = useState(0);
   const [flashGuessId, setFlashGuessId] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-
-  useEffect(() => {
-    onAttemptChange?.(tryNumber, MAX_TRIES);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tryNumber]);
 
   const trimmed = query.trim();
   const matches =
@@ -89,7 +83,10 @@ export function CountryStep({ answer, onComplete, onAttemptChange }: CountryStep
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-medium text-slate-100">Which country is this?</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <QuestionHeading>Which country is this?</QuestionHeading>
+        <AttemptBadge current={tryNumber} max={MAX_TRIES} />
+      </div>
       <MapScope
         center={answer.center}
         zoom={answer.mapZoom}
@@ -139,22 +136,22 @@ export function CountryStep({ answer, onComplete, onAttemptChange }: CountryStep
           </ul>
         )}
       </div>
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={skip}
-          disabled={locked}
-          className="rounded-lg border border-rose-700 px-3 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
-        >
-          Skip
-        </button>
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => submit(query)}
           disabled={!trimmed || locked}
-          className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
+          className="flex-1 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
         >
           Guess
+        </button>
+        <button
+          type="button"
+          onClick={skip}
+          disabled={locked}
+          className="flex-1 rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
+        >
+          Skip
         </button>
       </div>
     </div>

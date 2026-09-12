@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tryFraction } from '../lib/points';
 import { scoreCapitalGuess } from '../lib/scoring';
-import { FeedbackBadge, type FeedbackTone } from './Badge';
+import { AttemptBadge, FeedbackBadge, QuestionHeading, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CapitalGuessResult {
@@ -14,7 +14,6 @@ export interface CapitalGuessResult {
 interface CapitalStepProps {
   answer: Country;
   onComplete: (result: CapitalGuessResult) => void;
-  onAttemptChange?: (current: number, max: number) => void;
 }
 
 const MAX_TRIES = 3;
@@ -27,16 +26,11 @@ interface Feedback {
   label: string;
 }
 
-export function CapitalStep({ answer, onComplete, onAttemptChange }: CapitalStepProps) {
+export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
   const [value, setValue] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-
-  useEffect(() => {
-    onAttemptChange?.(tryNumber, MAX_TRIES);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tryNumber]);
 
   function submit() {
     if (!value.trim() || locked) return;
@@ -75,7 +69,10 @@ export function CapitalStep({ answer, onComplete, onAttemptChange }: CapitalStep
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-medium text-slate-100">What's the capital of {answer.name}?</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <QuestionHeading>What's the capital of {answer.name}?</QuestionHeading>
+        <AttemptBadge current={tryNumber} max={MAX_TRIES} />
+      </div>
       <MapScope
         center={answer.capitalCoords}
         zoom={answer.mapZoom + 1}
@@ -106,22 +103,22 @@ export function CapitalStep({ answer, onComplete, onAttemptChange }: CapitalStep
         placeholder="Type the capital..."
         className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
       />
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={skip}
-          disabled={locked}
-          className="rounded-lg border border-rose-700 px-3 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
-        >
-          Skip
-        </button>
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={submit}
           disabled={!value.trim() || locked}
-          className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
+          className="flex-1 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
         >
           Guess
+        </button>
+        <button
+          type="button"
+          onClick={skip}
+          disabled={locked}
+          className="flex-1 rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
+        >
+          Skip
         </button>
       </div>
     </div>
