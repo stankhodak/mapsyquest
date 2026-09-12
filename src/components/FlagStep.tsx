@@ -3,6 +3,7 @@ import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
 import { MAX_SCORE } from '../lib/points';
+import { AttemptBadge } from './Badge';
 
 export interface FlagGuessResult {
   guess: string;
@@ -53,6 +54,7 @@ export function FlagStep({ answer, onComplete }: FlagStepProps) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-medium text-slate-100">Which flag belongs to {answer.name}?</h2>
+      <AttemptBadge>1 Attempt</AttemptBadge>
       <div className="grid grid-cols-5 gap-2">
         {options.map((c) => {
           const isRevealed = selected !== null;

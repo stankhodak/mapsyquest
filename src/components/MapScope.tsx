@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Map as MapLibreMap, Marker, setWorkerUrl, type IControl } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, setWorkerUrl, type GeoJSONSource, type IControl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Geometry } from 'geojson';
 import type { LatLng } from '../data/types';
@@ -14,17 +14,21 @@ setWorkerUrl('/maplibre-gl-worker.mjs');
 interface MapScopeProps {
   center: LatLng;
   zoom: number;
-  /** ISO alpha-2 id, used to look up this country's outline in the generated shape dataset. */
+  /** ISO alpha-2 id of the round's answer, used to look up its outline for the hint/reveal. */
   countryId: string;
   /** Required when revealName is set. */
   countryName?: string;
-  /** Show this country's outline (amber). Used for the country step's 3rd-try hint and the capital step. */
+  /** Show the answer country's outline (amber). Used for the country step's 3rd-try hint and the capital step. */
   revealOutline?: boolean;
-  /** Also fit the camera to the outline's padded bounds when revealOutline turns on (country step only). */
+  /** Also fit the camera to the outline's padded bounds when revealOutline turns on. */
   fitToOutline?: boolean;
-  /** Show the country name as a small on-map label (capital step only). */
+  /** Show the country name as an on-map label at labelPosition (capital step only). */
   revealName?: boolean;
-  /** Bump to trigger a red flash of the outline + zoom-to-fit, then revert. */
+  /** Where to place the name label — the country's own centroid, not necessarily `center` (which may be the capital's pin). Required when revealName is set. */
+  labelPosition?: LatLng;
+  /** ISO alpha-2 id of the country the player actually guessed (wrong), if it matched a real country. Bump flashSignal to trigger a red flash of ITS outline; if this has no shape data, no flash occurs. */
+  flashGuessId?: string | null;
+  /** Bump to trigger the wrong-guess flash described above. */
   flashSignal?: number;
 }
 
@@ -41,9 +45,14 @@ const HINT_COLOR = '#f59e0b';
 const HINT_FILL_OPACITY = 0.25;
 const FLASH_COLOR = '#ef4444';
 const FLASH_FILL_OPACITY = 0.55;
-const OUTLINE_SOURCE_ID = 'target-country';
-const OUTLINE_FILL_LAYER_ID = 'target-country-fill';
-const OUTLINE_LINE_LAYER_ID = 'target-country-line';
+const HINT_SOURCE_ID = 'hint-country';
+const HINT_FILL_LAYER_ID = 'hint-country-fill';
+const HINT_LINE_LAYER_ID = 'hint-country-line';
+const GUESS_SOURCE_ID = 'guess-country';
+const GUESS_FILL_LAYER_ID = 'guess-country-fill';
+const GUESS_LINE_LAYER_ID = 'guess-country-line';
+
+type Shape = { bbox: [number, number, number, number]; geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown } };
 
 function hideAllLabels(map: MapLibreMap) {
   for (const layer of map.getStyle().layers ?? []) {
@@ -57,12 +66,10 @@ function revealBordersPast(map: MapLibreMap, startZoom: number) {
   }
 }
 
-function setOutlinePaint(map: MapLibreMap, color: string, opacity: number) {
-  if (!map.getLayer(OUTLINE_FILL_LAYER_ID)) return;
-  map.setPaintProperty(OUTLINE_FILL_LAYER_ID, 'fill-color', color);
-  map.setPaintProperty(OUTLINE_FILL_LAYER_ID, 'fill-opacity', opacity);
-  map.setPaintProperty(OUTLINE_LINE_LAYER_ID, 'line-color', color);
-  map.setPaintProperty(OUTLINE_LINE_LAYER_ID, 'line-opacity', opacity > 0 ? 1 : 0);
+function setOutlineOpacity(map: MapLibreMap, fillLayerId: string, lineLayerId: string, opacity: number) {
+  if (!map.getLayer(fillLayerId)) return;
+  map.setPaintProperty(fillLayerId, 'fill-opacity', opacity);
+  map.setPaintProperty(lineLayerId, 'line-opacity', opacity > 0 ? 1 : 0);
 }
 
 function fitToBounds(map: MapLibreMap, bbox: [number, number, number, number], animate: boolean) {
@@ -114,6 +121,20 @@ class CollapsedAttributionControl implements IControl {
   }
 }
 
+function createLabelElement(text: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.textContent = text.toUpperCase();
+  el.style.fontFamily = 'Georgia, "Times New Roman", serif';
+  el.style.fontWeight = '700';
+  el.style.fontSize = '20px';
+  el.style.letterSpacing = '0.08em';
+  el.style.color = '#1e293b';
+  el.style.textShadow = '0 0 5px #fff, 0 0 5px #fff, 0 0 8px #fff';
+  el.style.pointerEvents = 'none';
+  el.style.whiteSpace = 'nowrap';
+  return el;
+}
+
 /** Module-level cache: the generated shape dataset is ~270KB, so it's dynamically
  * imported (its own chunk, not the main bundle) and fetched only once per session. */
 let shapesPromise: Promise<typeof import('../data/countryShapes.generated')> | null = null;
@@ -139,17 +160,21 @@ export function MapScope({
   revealOutline,
   fitToOutline,
   revealName,
+  labelPosition,
+  flashGuessId,
   flashSignal,
 }: MapScopeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
-  const shapeRef = useRef<{ bbox: [number, number, number, number] } | null>(null);
+  const labelMarkerRef = useRef<Marker | null>(null);
+  const shapesRecordRef = useRef<Record<string, Shape> | null>(null);
+  const hintShapeRef = useRef<Shape | null>(null);
   const layersReadyRef = useRef(false);
   const revealOutlineRef = useRef(revealOutline);
-  // A plain re-render (forceRerender) wouldn't re-run the revealOutline effect below,
-  // since its dependency array wouldn't have changed — this tick is an explicit
-  // dependency so that effect re-applies once the (async-loaded) layers exist.
+  // A plain re-render wouldn't re-run the revealOutline effect below, since its
+  // dependency array wouldn't have changed — this tick is an explicit dependency so
+  // that effect re-applies once the (async-loaded) layers exist.
   const [layersReadyTick, setLayersReadyTick] = useState(0);
 
   revealOutlineRef.current = revealOutline;
@@ -181,31 +206,59 @@ export function MapScope({
     markerRef.current = new Marker({ color: '#f43f5e' }).setLngLat([center.lng, center.lat]).addTo(map);
     mapRef.current = map;
 
+    if (revealName && labelPosition && countryName) {
+      labelMarkerRef.current = new Marker({ element: createLabelElement(countryName), anchor: 'center' })
+        .setLngLat([labelPosition.lng, labelPosition.lat])
+        .addTo(map);
+    }
+
     let cancelled = false;
     loadCountryShapes().then(({ countryShapes }) => {
       if (cancelled) return;
+      shapesRecordRef.current = countryShapes;
       const shape = countryShapes[countryId];
       if (!shape) return; // no outline data for this country (see build script)
-      shapeRef.current = { bbox: shape.bbox };
+      hintShapeRef.current = shape;
 
       function addLayers() {
-        if (map.getSource(OUTLINE_SOURCE_ID)) return;
-        map.addSource(OUTLINE_SOURCE_ID, {
+        if (map.getSource(HINT_SOURCE_ID)) return;
+        map.addSource(HINT_SOURCE_ID, {
           type: 'geojson',
           data: { type: 'Feature', properties: {}, geometry: shape.geometry as Geometry },
         });
         map.addLayer({
-          id: OUTLINE_FILL_LAYER_ID,
+          id: HINT_FILL_LAYER_ID,
           type: 'fill',
-          source: OUTLINE_SOURCE_ID,
+          source: HINT_SOURCE_ID,
           paint: { 'fill-color': HINT_COLOR, 'fill-opacity': 0 },
         });
         map.addLayer({
-          id: OUTLINE_LINE_LAYER_ID,
+          id: HINT_LINE_LAYER_ID,
           type: 'line',
-          source: OUTLINE_SOURCE_ID,
+          source: HINT_SOURCE_ID,
           paint: { 'line-color': HINT_COLOR, 'line-width': 2, 'line-opacity': 0 },
         });
+
+        // Guess-flash layer starts on the same geometry as a harmless placeholder
+        // (hidden); its data is swapped to whichever country the player guessed
+        // wrong, at flash time.
+        map.addSource(GUESS_SOURCE_ID, {
+          type: 'geojson',
+          data: { type: 'Feature', properties: {}, geometry: shape.geometry as Geometry },
+        });
+        map.addLayer({
+          id: GUESS_FILL_LAYER_ID,
+          type: 'fill',
+          source: GUESS_SOURCE_ID,
+          paint: { 'fill-color': FLASH_COLOR, 'fill-opacity': 0 },
+        });
+        map.addLayer({
+          id: GUESS_LINE_LAYER_ID,
+          type: 'line',
+          source: GUESS_SOURCE_ID,
+          paint: { 'line-color': FLASH_COLOR, 'line-width': 2, 'line-opacity': 0 },
+        });
+
         layersReadyRef.current = true;
         setLayersReadyTick((n) => n + 1);
       }
@@ -225,14 +278,17 @@ export function MapScope({
     return () => {
       cancelled = true;
       markerRef.current?.remove();
+      labelMarkerRef.current?.remove();
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
+      labelMarkerRef.current = null;
       layersReadyRef.current = false;
     };
     // Each round/step renders its own MapScope instance (see RoundFlow's per-round `key`
     // and CountryStep/CapitalStep/FlagStep being distinct components), so center/zoom/
-    // countryId are only ever read once at construction — no need to react to changes.
+    // countryId/labelPosition etc. are only ever read once at construction — no need to
+    // react to changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -241,39 +297,38 @@ export function MapScope({
     const map = mapRef.current;
     if (!map || !layersReadyRef.current) return;
     if (revealOutline) {
-      setOutlinePaint(map, HINT_COLOR, HINT_FILL_OPACITY);
-      if (fitToOutline && shapeRef.current) fitToBounds(map, shapeRef.current.bbox, true);
+      setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, HINT_FILL_OPACITY);
+      if (fitToOutline && hintShapeRef.current) fitToBounds(map, hintShapeRef.current.bbox, true);
     } else {
-      setOutlinePaint(map, HINT_COLOR, 0);
+      setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, 0);
     }
     // layersReadyTick isn't read here, but bumping it re-runs this effect once the
     // (async-loaded) outline layers exist, applying whatever revealOutline already was.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealOutline, fitToOutline, layersReadyTick]);
 
-  // On a wrong guess (flashSignal bump): fit to the country's bounds, flash its
-  // outline red, then either settle back into the hint state or return to the
-  // round's starting view — per the "wrong answer" feedback in geo-game-instructions.md.
+  // On a wrong guess (flashSignal bump): flash the GUESSED country's outline in red,
+  // fit to its bounds, then either settle back into the hint state or return to the
+  // round's starting view. If the guess didn't match a real country (or we have no
+  // shape data for it), no map flash occurs at all.
   useEffect(() => {
     if (!flashSignal) return;
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !layersReadyRef.current) return;
 
-    if (!layersReadyRef.current || !shapeRef.current) {
-      // No outline data for this country (see build script) — fall back to a plain
-      // camera reset so wrong guesses still get some feedback.
-      map.jumpTo({ center: [center.lng, center.lat], zoom });
-      return;
-    }
+    const guessShape = flashGuessId ? shapesRecordRef.current?.[flashGuessId] : null;
+    if (!guessShape) return;
 
-    setOutlinePaint(map, FLASH_COLOR, FLASH_FILL_OPACITY);
-    fitToBounds(map, shapeRef.current.bbox, true);
+    const source = map.getSource(GUESS_SOURCE_ID) as GeoJSONSource | undefined;
+    source?.setData({ type: 'Feature', properties: {}, geometry: guessShape.geometry as Geometry });
+    setOutlineOpacity(map, GUESS_FILL_LAYER_ID, GUESS_LINE_LAYER_ID, FLASH_FILL_OPACITY);
+    fitToBounds(map, guessShape.bbox, true);
 
     const timeout = window.setTimeout(() => {
-      if (revealOutlineRef.current) {
-        setOutlinePaint(map, HINT_COLOR, HINT_FILL_OPACITY);
+      setOutlineOpacity(map, GUESS_FILL_LAYER_ID, GUESS_LINE_LAYER_ID, 0);
+      if (revealOutlineRef.current && hintShapeRef.current) {
+        fitToBounds(map, hintShapeRef.current.bbox, true);
       } else {
-        setOutlinePaint(map, HINT_COLOR, 0);
         map.easeTo({ center: [center.lng, center.lat], zoom, duration: 500 });
       }
     }, FLASH_DURATION_MS);
@@ -291,12 +346,6 @@ export function MapScope({
         ref={containerRef}
         className="relative aspect-video w-full touch-none select-none overflow-hidden rounded-xl border border-slate-700 bg-sky-950"
       >
-        {revealName && countryName && (
-          <div className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-slate-800/80 px-2 py-1 text-xs font-medium text-slate-100">
-            {countryName}
-          </div>
-        )}
-
         <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1">
           <button
             type="button"

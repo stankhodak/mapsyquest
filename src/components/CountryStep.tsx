@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tryFraction } from '../lib/points';
+import { AttemptBadge, FeedbackBadge, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CountryGuessResult {
@@ -18,15 +19,21 @@ interface CountryStepProps {
 const MIN_QUERY_LENGTH = 3;
 const MAX_SUGGESTIONS = 8;
 const MAX_TRIES = 3;
-/** Matches MapScope's red-flash duration, so the input unlocks right as the flash fades. */
-const RETRY_DELAY_MS = 900;
+/** How long the feedback badge (and MapScope's matching flash) shows before advancing. */
+const FEEDBACK_DELAY_MS = 900;
+
+interface Feedback {
+  tone: FeedbackTone;
+  label: string;
+}
 
 export function CountryStep({ answer, onComplete }: CountryStepProps) {
   const [query, setQuery] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
   const [flashSignal, setFlashSignal] = useState(0);
+  const [flashGuessId, setFlashGuessId] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   const trimmed = query.trim();
   const matches =
@@ -39,27 +46,31 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
   function submit(name: string) {
     if (!name.trim() || locked) return;
     const isCorrect = name.trim().toLowerCase() === answer.name.toLowerCase();
+    setLocked(true);
 
     if (isCorrect) {
       const score = Math.round(MAX_SCORE.country * tryFraction(tryNumber));
-      onComplete({ guess: name, isCorrect: true, score });
+      setFeedback({ tone: 'correct', label: 'Correct!' });
+      window.setTimeout(() => onComplete({ guess: name, isCorrect: true, score }), FEEDBACK_DELAY_MS);
       return;
     }
 
-    setLocked(true);
+    // Flash the actual (wrong) guessed country's outline in red, if it matched a real
+    // country — no map flash for unrecognised text (typos/gibberish), per design.
+    const guessedCountry = countries.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+    setFlashGuessId(guessedCountry?.id ?? null);
     setFlashSignal((s) => s + 1);
+    setFeedback({ tone: 'wrong', label: 'Wrong' });
 
     if (tryNumber >= MAX_TRIES) {
-      window.setTimeout(() => onComplete({ guess: name, isCorrect: false, score: 0 }), RETRY_DELAY_MS);
+      window.setTimeout(() => onComplete({ guess: name, isCorrect: false, score: 0 }), FEEDBACK_DELAY_MS);
     } else {
-      const triesLeft = MAX_TRIES - tryNumber;
-      setFeedback(`Not quite — ${triesLeft} ${triesLeft === 1 ? 'try' : 'tries'} left`);
       window.setTimeout(() => {
         setTryNumber((t) => t + 1);
         setQuery('');
         setLocked(false);
         setFeedback(null);
-      }, RETRY_DELAY_MS);
+      }, FEEDBACK_DELAY_MS);
     }
   }
 
@@ -79,8 +90,18 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
         countryId={answer.id}
         revealOutline={onFinalTry}
         fitToOutline={onFinalTry}
+        flashGuessId={flashGuessId}
         flashSignal={flashSignal}
       />
+      <div className="flex flex-wrap items-center gap-3">
+        <AttemptBadge>
+          Attempt {tryNumber} of {MAX_TRIES}
+        </AttemptBadge>
+        {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
+      </div>
+      {onFinalTry && !feedback && (
+        <p className="text-xs text-slate-400">Last try — outline revealed on the map</p>
+      )}
       <div className="relative">
         <input
           autoFocus
@@ -88,7 +109,6 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
           disabled={locked}
           onChange={(e) => {
             setQuery(e.target.value);
-            setFeedback(null);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit(query);
@@ -112,28 +132,23 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
           </ul>
         )}
       </div>
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-slate-400">
-          {feedback ?? (onFinalTry ? 'Last try — outline revealed on the map' : `Attempt ${tryNumber} of ${MAX_TRIES}`)}
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={skip}
-            disabled={locked}
-            className="rounded-lg border border-rose-700 px-3 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
-          >
-            Skip
-          </button>
-          <button
-            type="button"
-            onClick={() => submit(query)}
-            disabled={!trimmed || locked}
-            className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
-          >
-            Guess
-          </button>
-        </div>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={skip}
+          disabled={locked}
+          className="rounded-lg border border-rose-700 px-3 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
+        >
+          Skip
+        </button>
+        <button
+          type="button"
+          onClick={() => submit(query)}
+          disabled={!trimmed || locked}
+          className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
+        >
+          Guess
+        </button>
       </div>
     </div>
   );

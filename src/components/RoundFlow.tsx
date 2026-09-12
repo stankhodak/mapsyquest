@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Country } from '../data/types';
 import { starMultiplier } from '../lib/points';
+import { RoundBadge } from './Badge';
 import { CapitalStep, type CapitalGuessResult } from './CapitalStep';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
 import { FlagStep, type FlagGuessResult } from './FlagStep';
@@ -60,9 +61,9 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
-      <p className="text-sm uppercase tracking-wide text-slate-400">
+      <RoundBadge>
         Round {roundNumber} of {totalRounds}
-      </p>
+      </RoundBadge>
 
       {step === 'country' && <CountryStep answer={country} onComplete={handleCountryComplete} />}
       {step === 'capital' && <CapitalStep answer={country} onComplete={handleCapitalComplete} />}
