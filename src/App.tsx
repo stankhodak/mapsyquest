@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { RoundFlow, type RoundResult } from './components/RoundFlow';
 import { getDailyCountries, todayKey } from './lib/daily';
 import {
+  clearDailyRecord,
   loadDailyRecord,
   loadStreak,
   saveDailyCompletion,
@@ -26,6 +27,8 @@ function App() {
   const [streak, setStreak] = useState<StreakState>(() => loadStreak());
   const [roundIndex, setRoundIndex] = useState(0);
   const [results, setResults] = useState<RoundResult[]>([]);
+  // Bumped on reset so RoundFlow remounts even when round 1's country id is unchanged.
+  const [resetCount, setResetCount] = useState(0);
 
   // Day-locked: today's game was already completed (possibly in an earlier
   // visit), so skip straight to the results already on record instead of
@@ -55,6 +58,15 @@ function App() {
     setRoundIndex((prev) => prev + 1);
   }
 
+  /** Technical/testing helper: wipes today's progress so the day can be replayed. */
+  function handleReset() {
+    clearDailyRecord(dateKey);
+    setStoredRecord(null);
+    setResults([]);
+    setRoundIndex(0);
+    setResetCount((n) => n + 1);
+  }
+
   const summaryRows: SummaryRow[] =
     storedRecord?.results ??
     results.map((r) => ({
@@ -76,11 +88,12 @@ function App() {
       <main>
         {!isGameOver && (
           <RoundFlow
-            key={dailyCountries[roundIndex].id}
+            key={`${resetCount}-${dailyCountries[roundIndex].id}`}
             country={dailyCountries[roundIndex]}
             roundNumber={roundIndex + 1}
             totalRounds={dailyCountries.length}
             onRoundComplete={handleRoundComplete}
+            onReset={handleReset}
           />
         )}
 
@@ -95,11 +108,12 @@ function App() {
             <p className="text-lg">
               {totalStars} / {dailyCountries.length * 3} stars &middot; {totalPoints} points
             </p>
-            <ul className="space-y-2 text-left text-sm text-slate-300">
+            <ul className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 text-left text-sm text-slate-300">
               {summaryRows.map((r) => (
-                <li key={r.countryId} className="rounded-lg border border-slate-700 px-3 py-2">
-                  <span className="font-medium text-slate-100">{r.countryName}</span> — {r.stars}
-                  ⭐ · {r.points} pts
+                <li key={r.countryId} className="contents">
+                  <span className="truncate font-medium text-slate-100">{r.countryName}</span>
+                  <span className="text-right">{r.stars}⭐</span>
+                  <span className="text-right">{r.points} pts</span>
                 </li>
               ))}
             </ul>

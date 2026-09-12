@@ -1,31 +1,28 @@
 /**
- * Point weighting is provisional per the "Point weighting" note in
- * geo-game-instructions.md: capital is worth the most, country the least — but
- * without visible borders, country name may turn out to be the hardest category,
- * so this is flagged for revisiting after playtesting (may become
- * capital > country > flag instead). Kept as a plain config object so it's a
- * one-line change to retune.
+ * Max score per category, each earned over up to 3 tries. Order (capital > flag >
+ * country) mirrors the original weighting note in geo-game-instructions.md.
  */
-export const CATEGORY_WEIGHTS = {
-  capital: 50,
-  flag: 30,
-  country: 20,
+export const MAX_SCORE = {
+  country: 100,
+  flag: 200,
+  capital: 300,
 } as const;
 
-export type ScoringCategory = keyof typeof CATEGORY_WEIGHTS;
+export type ScoringCategory = keyof typeof MAX_SCORE;
 
-/** Linear decay from 1.0 (instant) to 0.5 (at maxMs or slower). */
-export function speedMultiplier(elapsedMs: number, maxMs = 20000): number {
-  const clamped = Math.min(Math.max(elapsedMs, 0), maxMs);
-  return 1 - (clamped / maxMs) * 0.5;
+/** Fraction of max score awarded per try (1st/2nd/3rd): flat -30 percentage points per try. */
+const TRY_FRACTIONS = [1, 0.7, 0.4] as const;
+
+export function tryFraction(tryNumber: number): number {
+  return TRY_FRACTIONS[tryNumber - 1] ?? 0;
 }
 
-/** correctnessFraction is 0/1 for pass-fail categories (country, flag), or score/100 for capital. */
-export function categoryPoints(
-  category: ScoringCategory,
-  correctnessFraction: number,
-  elapsedMs: number,
-): number {
-  const weight = CATEGORY_WEIGHTS[category];
-  return Math.round(weight * correctnessFraction * speedMultiplier(elapsedMs));
+/**
+ * Star-count multiplier applied to a round's total score: +30% per star, with the
+ * 3-star case rounded up to a clean 2x ("a perfect round doubles your score").
+ */
+const STAR_MULTIPLIERS = [1, 1.3, 1.6, 2] as const;
+
+export function starMultiplier(starCount: number): number {
+  return STAR_MULTIPLIERS[starCount] ?? 1;
 }

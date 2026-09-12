@@ -46,6 +46,15 @@ function safeSetItem(key: string, value: string): void {
   }
 }
 
+/** Technical/testing helper: clears today's completion lock so the day can be replayed. Leaves the streak untouched. */
+export function clearDailyRecord(dateKey: string): void {
+  try {
+    window.localStorage.removeItem(RESULT_KEY_PREFIX + dateKey);
+  } catch {
+    // Ignore — private browsing, blocked storage, etc.
+  }
+}
+
 export function loadDailyRecord(dateKey: string): StoredDailyRecord | null {
   const raw = safeGetItem(RESULT_KEY_PREFIX + dateKey);
   if (!raw) return null;

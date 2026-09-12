@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Country } from '../data/types';
-import { categoryPoints } from '../lib/points';
+import { starMultiplier } from '../lib/points';
 import { CapitalStep, type CapitalGuessResult } from './CapitalStep';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
 import { FlagStep, type FlagGuessResult } from './FlagStep';
@@ -19,11 +19,13 @@ interface RoundFlowProps {
   roundNumber: number;
   totalRounds: number;
   onRoundComplete: (result: RoundResult) => void;
+  /** Technical/testing reset: wipes today's progress so the day can be replayed. */
+  onReset: () => void;
 }
 
 type Step = 'country' | 'capital' | 'flag' | 'summary';
 
-export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }: RoundFlowProps) {
+export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete, onReset }: RoundFlowProps) {
   const [step, setStep] = useState<Step>('country');
   const [countryGuess, setCountryGuess] = useState<CountryGuessResult | null>(null);
   const [capitalGuess, setCapitalGuess] = useState<CapitalGuessResult | null>(null);
@@ -44,18 +46,18 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
     setStep('summary');
   }
 
+  const allGuessesIn = countryGuess !== null && capitalGuess !== null && flagGuess !== null;
+  const stars = allGuessesIn
+    ? (countryGuess.isCorrect ? 1 : 0) + (capitalGuess.isStar ? 1 : 0) + (flagGuess.isCorrect ? 1 : 0)
+    : 0;
+  const multiplier = starMultiplier(stars);
+  const roundPoints = allGuessesIn
+    ? Math.round((countryGuess.score + capitalGuess.score + flagGuess.score) * multiplier)
+    : 0;
+
   function finishRound() {
     if (!countryGuess || !capitalGuess || !flagGuess) return;
-
-    const stars =
-      (countryGuess.isCorrect ? 1 : 0) + (capitalGuess.isStar ? 1 : 0) + (flagGuess.isCorrect ? 1 : 0);
-
-    const points =
-      categoryPoints('country', countryGuess.isCorrect ? 1 : 0, countryGuess.elapsedMs) +
-      categoryPoints('capital', capitalGuess.score / 100, capitalGuess.elapsedMs) +
-      categoryPoints('flag', flagGuess.isCorrect ? 1 : 0, flagGuess.elapsedMs);
-
-    onRoundComplete({ country, countryGuess, capitalGuess, flagGuess, stars, points });
+    onRoundComplete({ country, countryGuess, capitalGuess, flagGuess, stars, points: roundPoints });
   }
 
   return (
@@ -75,21 +77,36 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
           </h2>
           <ul className="space-y-1 text-sm text-slate-300">
             <li>
-              Country: {countryGuess.isCorrect ? '⭐ correct' : `✗ (you said "${countryGuess.guess}")`}
+              Country:{' '}
+              {countryGuess.isCorrect
+                ? `⭐ correct (${countryGuess.score} pts)`
+                : `✗ (you said "${countryGuess.guess}")`}
             </li>
             <li>
-              Capital: {capitalGuess.score}% {capitalGuess.isStar ? '⭐' : ''} (you said "
-              {capitalGuess.guess}")
+              Capital: {capitalGuess.isStar ? '⭐ ' : ''}
+              {capitalGuess.score} pts (you said "{capitalGuess.guess}") — correct: {country.capital}
             </li>
-            <li>Flag: {flagGuess.isCorrect ? '⭐ correct' : '✗ incorrect'}</li>
+            <li>Flag: {flagGuess.isCorrect ? `⭐ correct (${flagGuess.score} pts)` : '✗ incorrect'}</li>
           </ul>
-          <button
-            type="button"
-            onClick={finishRound}
-            className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white"
-          >
-            {roundNumber < totalRounds ? 'Next round' : 'See results'}
-          </button>
+          <p className="text-base font-semibold text-slate-100">
+            {stars} {stars === 1 ? 'star' : 'stars'} · {roundPoints} points ({multiplier}x)
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={finishRound}
+              className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white"
+            >
+              {roundNumber < totalRounds ? 'Next round' : 'See results'}
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 hover:bg-slate-800"
+            >
+              Reset (dev)
+            </button>
+          </div>
         </div>
       )}
     </div>

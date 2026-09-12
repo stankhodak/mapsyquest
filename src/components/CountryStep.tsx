@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
+import { MAX_SCORE, tryFraction } from '../lib/points';
 import { MapScope } from './MapScope';
 
 export interface CountryGuessResult {
   guess: string;
   isCorrect: boolean;
-  elapsedMs: number;
+  score: number;
 }
 
 interface CountryStepProps {
@@ -16,10 +17,16 @@ interface CountryStepProps {
 
 const MIN_QUERY_LENGTH = 3;
 const MAX_SUGGESTIONS = 8;
+const MAX_TRIES = 3;
+/** Matches MapScope's red-flash duration, so the input unlocks right as the flash fades. */
+const RETRY_DELAY_MS = 700;
 
 export function CountryStep({ answer, onComplete }: CountryStepProps) {
   const [query, setQuery] = useState('');
-  const [startTime] = useState(() => Date.now());
+  const [tryNumber, setTryNumber] = useState(1);
+  const [flashSignal, setFlashSignal] = useState(0);
+  const [locked, setLocked] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const trimmed = query.trim();
   const matches =
@@ -30,30 +37,51 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
       : [];
 
   function submit(name: string) {
-    if (!name.trim()) return;
-    onComplete({
-      guess: name,
-      isCorrect: name.trim().toLowerCase() === answer.name.toLowerCase(),
-      elapsedMs: Date.now() - startTime,
-    });
+    if (!name.trim() || locked) return;
+    const isCorrect = name.trim().toLowerCase() === answer.name.toLowerCase();
+
+    if (isCorrect) {
+      const score = Math.round(MAX_SCORE.country * tryFraction(tryNumber));
+      onComplete({ guess: name, isCorrect: true, score });
+      return;
+    }
+
+    setLocked(true);
+    setFlashSignal((s) => s + 1);
+
+    if (tryNumber >= MAX_TRIES) {
+      window.setTimeout(() => onComplete({ guess: name, isCorrect: false, score: 0 }), RETRY_DELAY_MS);
+    } else {
+      const triesLeft = MAX_TRIES - tryNumber;
+      setFeedback(`Not quite — ${triesLeft} ${triesLeft === 1 ? 'try' : 'tries'} left`);
+      window.setTimeout(() => {
+        setTryNumber((t) => t + 1);
+        setQuery('');
+        setLocked(false);
+      }, RETRY_DELAY_MS);
+    }
   }
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-medium text-slate-100">Which country is this?</h2>
-      <MapScope center={answer.center} zoom={answer.mapZoom} />
+      <MapScope center={answer.center} zoom={answer.mapZoom} flashSignal={flashSignal} />
       <div className="relative">
         <input
           autoFocus
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          disabled={locked}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setFeedback(null);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit(query);
           }}
           placeholder="Type a country name..."
-          className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
         />
-        {matches.length > 0 && (
+        {matches.length > 0 && !locked && (
           <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-slate-600 bg-slate-800 shadow-lg">
             {matches.map((c) => (
               <li key={c.id}>
@@ -69,14 +97,17 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
           </ul>
         )}
       </div>
-      <button
-        type="button"
-        onClick={() => submit(query)}
-        disabled={!trimmed}
-        className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
-      >
-        Guess
-      </button>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-xs text-slate-400">{feedback ?? `Attempt ${tryNumber} of ${MAX_TRIES}`}</p>
+        <button
+          type="button"
+          onClick={() => submit(query)}
+          disabled={!trimmed || locked}
+          className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-40"
+        >
+          Guess
+        </button>
+      </div>
     </div>
   );
 }
