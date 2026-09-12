@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tryFraction } from '../lib/points';
 import { scoreCapitalGuess } from '../lib/scoring';
-import { AttemptBadge, FeedbackBadge, type FeedbackTone } from './Badge';
+import { FeedbackBadge, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CapitalGuessResult {
@@ -14,21 +14,29 @@ export interface CapitalGuessResult {
 interface CapitalStepProps {
   answer: Country;
   onComplete: (result: CapitalGuessResult) => void;
+  onAttemptChange?: (current: number, max: number) => void;
 }
 
 const MAX_TRIES = 3;
 const FEEDBACK_DELAY_MS = 900;
+/** Tighter than the country step's hint margin, so the country fills most of the frame. */
+const OUTLINE_PADDING_FRACTION = 0.12;
 
 interface Feedback {
   tone: FeedbackTone;
   label: string;
 }
 
-export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
+export function CapitalStep({ answer, onComplete, onAttemptChange }: CapitalStepProps) {
   const [value, setValue] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+
+  useEffect(() => {
+    onAttemptChange?.(tryNumber, MAX_TRIES);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tryNumber]);
 
   function submit() {
     if (!value.trim() || locked) return;
@@ -66,7 +74,7 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <h2 className="text-lg font-medium text-slate-100">What's the capital of {answer.name}?</h2>
       <MapScope
         center={answer.capitalCoords}
@@ -75,19 +83,20 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
         countryName={answer.name}
         revealOutline
         fitToOutline
+        outlinePaddingFraction={OUTLINE_PADDING_FRACTION}
         revealName
         labelPosition={answer.center}
       />
-      <div className="flex flex-wrap items-center gap-3">
-        <AttemptBadge>
-          Attempt {tryNumber} of {MAX_TRIES}
-        </AttemptBadge>
-        {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
-      </div>
+      {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
       <input
-        autoFocus
         value={value}
         disabled={locked}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        data-lpignore="true"
+        data-1p-ignore="true"
         onChange={(e) => {
           setValue(e.target.value);
         }}

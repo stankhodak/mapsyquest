@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Country } from '../data/types';
 import { starMultiplier } from '../lib/points';
-import { RoundBadge } from './Badge';
+import { AttemptBadge, RoundBadge } from './Badge';
 import { CapitalStep, type CapitalGuessResult } from './CapitalStep';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
 import { FlagStep, type FlagGuessResult } from './FlagStep';
@@ -29,6 +29,11 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
   const [countryGuess, setCountryGuess] = useState<CountryGuessResult | null>(null);
   const [capitalGuess, setCapitalGuess] = useState<CapitalGuessResult | null>(null);
   const [flagGuess, setFlagGuess] = useState<FlagGuessResult | null>(null);
+  // Tagged with the step it was reported for, so a stale report from the step just
+  // left doesn't flash before the new step's own mount effect reports in — derived
+  // at render time rather than reset via an effect.
+  const [attemptReport, setAttemptReport] = useState({ step: 'country' as Step, current: 1, max: 3 });
+  const attempt = attemptReport.step === step ? attemptReport : { current: 1, max: 3 };
 
   function handleCountryComplete(result: CountryGuessResult) {
     setCountryGuess(result);
@@ -61,12 +66,31 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
-      <RoundBadge>
-        Round {roundNumber} of {totalRounds}
-      </RoundBadge>
+      <div className="flex flex-wrap items-center gap-3">
+        <RoundBadge>
+          Round {roundNumber} of {totalRounds}
+        </RoundBadge>
+        {(step === 'country' || step === 'capital') && (
+          <AttemptBadge>
+            Attempt {attempt.current} of {attempt.max}
+          </AttemptBadge>
+        )}
+      </div>
 
-      {step === 'country' && <CountryStep answer={country} onComplete={handleCountryComplete} />}
-      {step === 'capital' && <CapitalStep answer={country} onComplete={handleCapitalComplete} />}
+      {step === 'country' && (
+        <CountryStep
+          answer={country}
+          onComplete={handleCountryComplete}
+          onAttemptChange={(current, max) => setAttemptReport({ step: 'country', current, max })}
+        />
+      )}
+      {step === 'capital' && (
+        <CapitalStep
+          answer={country}
+          onComplete={handleCapitalComplete}
+          onAttemptChange={(current, max) => setAttemptReport({ step: 'capital', current, max })}
+        />
+      )}
       {step === 'flag' && <FlagStep answer={country} onComplete={handleFlagComplete} />}
 
       {step === 'summary' && countryGuess && capitalGuess && flagGuess && (

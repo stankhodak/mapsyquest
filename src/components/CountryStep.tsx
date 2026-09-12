@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tryFraction } from '../lib/points';
-import { AttemptBadge, FeedbackBadge, type FeedbackTone } from './Badge';
+import { FeedbackBadge, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CountryGuessResult {
@@ -14,6 +14,7 @@ export interface CountryGuessResult {
 interface CountryStepProps {
   answer: Country;
   onComplete: (result: CountryGuessResult) => void;
+  onAttemptChange?: (current: number, max: number) => void;
 }
 
 const MIN_QUERY_LENGTH = 3;
@@ -27,13 +28,18 @@ interface Feedback {
   label: string;
 }
 
-export function CountryStep({ answer, onComplete }: CountryStepProps) {
+export function CountryStep({ answer, onComplete, onAttemptChange }: CountryStepProps) {
   const [query, setQuery] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
   const [flashSignal, setFlashSignal] = useState(0);
   const [flashGuessId, setFlashGuessId] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+
+  useEffect(() => {
+    onAttemptChange?.(tryNumber, MAX_TRIES);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tryNumber]);
 
   const trimmed = query.trim();
   const matches =
@@ -82,7 +88,7 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
   const onFinalTry = tryNumber >= MAX_TRIES;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <h2 className="text-lg font-medium text-slate-100">Which country is this?</h2>
       <MapScope
         center={answer.center}
@@ -93,12 +99,7 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
         flashGuessId={flashGuessId}
         flashSignal={flashSignal}
       />
-      <div className="flex flex-wrap items-center gap-3">
-        <AttemptBadge>
-          Attempt {tryNumber} of {MAX_TRIES}
-        </AttemptBadge>
-        {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
-      </div>
+      {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
       {onFinalTry && !feedback && (
         <p className="text-xs text-slate-400">Last try — outline revealed on the map</p>
       )}
@@ -107,6 +108,12 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
           autoFocus
           value={query}
           disabled={locked}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-lpignore="true"
+          data-1p-ignore="true"
           onChange={(e) => {
             setQuery(e.target.value);
           }}

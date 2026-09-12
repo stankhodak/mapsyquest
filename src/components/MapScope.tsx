@@ -22,6 +22,8 @@ interface MapScopeProps {
   revealOutline?: boolean;
   /** Also fit the camera to the outline's padded bounds when revealOutline turns on. */
   fitToOutline?: boolean;
+  /** Fraction of the outline's own width/height added as margin per side when fitting to it (e.g. 0.15 = 30% larger box). Defaults to a generous hint-reveal margin; the capital step uses a tighter value so the country fills more of the frame. */
+  outlinePaddingFraction?: number;
   /** Show the country name as an on-map label at labelPosition (capital step only). */
   revealName?: boolean;
   /** Where to place the name label — the country's own centroid, not necessarily `center` (which may be the capital's pin). Required when revealName is set. */
@@ -45,6 +47,9 @@ const HINT_COLOR = '#f59e0b';
 const HINT_FILL_OPACITY = 0.25;
 const FLASH_COLOR = '#ef4444';
 const FLASH_FILL_OPACITY = 0.55;
+const DEFAULT_OUTLINE_PADDING_FRACTION = 0.15;
+/** The wrong-guess flash always uses this generous margin, regardless of outlinePaddingFraction. */
+const GUESS_FLASH_PADDING_FRACTION = 0.15;
 const HINT_SOURCE_ID = 'hint-country';
 const HINT_FILL_LAYER_ID = 'hint-country-fill';
 const HINT_LINE_LAYER_ID = 'hint-country-line';
@@ -70,6 +75,14 @@ function setOutlineOpacity(map: MapLibreMap, fillLayerId: string, lineLayerId: s
   if (!map.getLayer(fillLayerId)) return;
   map.setPaintProperty(fillLayerId, 'fill-opacity', opacity);
   map.setPaintProperty(lineLayerId, 'line-opacity', opacity > 0 ? 1 : 0);
+}
+
+/** Expands a raw bbox by `fraction` of its own width/height on each side. */
+function padBbox(bbox: [number, number, number, number], fraction: number): [number, number, number, number] {
+  const [west, south, east, north] = bbox;
+  const lngPad = (east - west) * fraction;
+  const latPad = (north - south) * fraction;
+  return [west - lngPad, south - latPad, east + lngPad, north + latPad];
 }
 
 function fitToBounds(map: MapLibreMap, bbox: [number, number, number, number], animate: boolean) {
@@ -159,6 +172,7 @@ export function MapScope({
   countryName,
   revealOutline,
   fitToOutline,
+  outlinePaddingFraction = DEFAULT_OUTLINE_PADDING_FRACTION,
   revealName,
   labelPosition,
   flashGuessId,
@@ -298,14 +312,16 @@ export function MapScope({
     if (!map || !layersReadyRef.current) return;
     if (revealOutline) {
       setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, HINT_FILL_OPACITY);
-      if (fitToOutline && hintShapeRef.current) fitToBounds(map, hintShapeRef.current.bbox, true);
+      if (fitToOutline && hintShapeRef.current) {
+        fitToBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), true);
+      }
     } else {
       setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, 0);
     }
     // layersReadyTick isn't read here, but bumping it re-runs this effect once the
     // (async-loaded) outline layers exist, applying whatever revealOutline already was.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [revealOutline, fitToOutline, layersReadyTick]);
+  }, [revealOutline, fitToOutline, outlinePaddingFraction, layersReadyTick]);
 
   // On a wrong guess (flashSignal bump): flash the GUESSED country's outline in red,
   // fit to its bounds, then either settle back into the hint state or return to the
@@ -322,12 +338,12 @@ export function MapScope({
     const source = map.getSource(GUESS_SOURCE_ID) as GeoJSONSource | undefined;
     source?.setData({ type: 'Feature', properties: {}, geometry: guessShape.geometry as Geometry });
     setOutlineOpacity(map, GUESS_FILL_LAYER_ID, GUESS_LINE_LAYER_ID, FLASH_FILL_OPACITY);
-    fitToBounds(map, guessShape.bbox, true);
+    fitToBounds(map, padBbox(guessShape.bbox, GUESS_FLASH_PADDING_FRACTION), true);
 
     const timeout = window.setTimeout(() => {
       setOutlineOpacity(map, GUESS_FILL_LAYER_ID, GUESS_LINE_LAYER_ID, 0);
       if (revealOutlineRef.current && hintShapeRef.current) {
-        fitToBounds(map, hintShapeRef.current.bbox, true);
+        fitToBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), true);
       } else {
         map.easeTo({ center: [center.lng, center.lat], zoom, duration: 500 });
       }
