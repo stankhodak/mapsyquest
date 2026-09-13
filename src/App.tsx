@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RoundFlow, type RoundResult } from './components/RoundFlow';
 import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
@@ -16,6 +16,23 @@ interface SummaryRow {
   countryName: string;
   stars: number;
   points: number;
+}
+
+function buildShareText(
+  dateKey: string,
+  totalStars: number,
+  totalRounds: number,
+  totalPoints: number,
+  streakDays: number,
+  rows: SummaryRow[],
+): string {
+  const lines = [
+    `MapsyQuest — ${dateKey}`,
+    `⭐ ${totalStars}/${totalRounds * 3} · ${totalPoints} pts${streakDays > 0 ? ` · 🔥 ${streakDays}` : ''}`,
+    '',
+    ...rows.map((r) => `${'⭐'.repeat(r.stars)}${'⬛'.repeat(3 - r.stars)} ${r.countryName}`),
+  ];
+  return lines.join('\n');
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -41,6 +58,13 @@ function App() {
   const [results, setResults] = useState<RoundResult[]>([]);
   // Bumped on reset so RoundFlow remounts even when round 1's country id is unchanged.
   const [resetCount, setResetCount] = useState(0);
+  const [showCopiedNotice, setShowCopiedNotice] = useState(false);
+
+  useEffect(() => {
+    if (!showCopiedNotice) return;
+    const timer = setTimeout(() => setShowCopiedNotice(false), 1800);
+    return () => clearTimeout(timer);
+  }, [showCopiedNotice]);
 
   // Day-locked: today's game was already completed (possibly in an earlier
   // visit), so skip straight to the results already on record instead of
@@ -78,6 +102,30 @@ function App() {
     setRoundIndex(0);
     setPlayOrder(shuffle(getDailyCountries(dateKey)));
     setResetCount((n) => n + 1);
+  }
+
+  async function handleShare() {
+    const text = buildShareText(
+      dateKey,
+      totalStars,
+      playOrder.length,
+      totalPoints,
+      streak.currentStreak,
+      summaryRows,
+    );
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setShowCopiedNotice(true);
   }
 
   const summaryRows: SummaryRow[] =
@@ -130,13 +178,27 @@ function App() {
               ))}
             </ul>
             <p className="text-xs text-slate-500">Come back tomorrow for a new set of countries.</p>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
-            >
-              Reset
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={handleShare}
+                className="rounded-lg border border-emerald-600 bg-emerald-600/10 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-600/20"
+              >
+                Share results
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              >
+                Reset
+              </button>
+            </div>
+            {showCopiedNotice && (
+              <p role="status" className="text-sm text-emerald-400">
+                Results copied!
+              </p>
+            )}
           </div>
         )}
       </main>
