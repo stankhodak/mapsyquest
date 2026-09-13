@@ -53,7 +53,7 @@ export function FlagStep({ answer, onComplete }: FlagStepProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <QuestionHeading>Which flag belongs to {answer.name}?</QuestionHeading>
         <AttemptBadge current={1} max={1} tone="red" label="Only One Attempt" />
       </div>

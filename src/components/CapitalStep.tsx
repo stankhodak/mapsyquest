@@ -69,7 +69,7 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <QuestionHeading>What's the capital of {answer.name}?</QuestionHeading>
         <AttemptBadge current={tryNumber} max={MAX_TRIES} />
       </div>
@@ -84,7 +84,6 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
         revealName
         labelPosition={answer.center}
       />
-      {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
       <input
         value={value}
         disabled={locked}
@@ -104,6 +103,7 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
         className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
       />
       <div className="flex items-center gap-2">
+        {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
         <button
           type="button"
           onClick={submit}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tryFraction } from '../lib/points';
+import { normaliseCapital } from '../lib/scoring';
 import { AttemptBadge, FeedbackBadge, QuestionHeading, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
@@ -39,13 +40,13 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
   const matches =
     trimmed.length >= MIN_QUERY_LENGTH
       ? countries
-          .filter((c) => c.name.toLowerCase().includes(trimmed.toLowerCase()))
+          .filter((c) => normaliseCapital(c.name).includes(normaliseCapital(trimmed)))
           .slice(0, MAX_SUGGESTIONS)
       : [];
 
   function submit(name: string) {
     if (!name.trim() || locked) return;
-    const isCorrect = name.trim().toLowerCase() === answer.name.toLowerCase();
+    const isCorrect = normaliseCapital(name) === normaliseCapital(answer.name);
     setLocked(true);
 
     if (isCorrect) {
@@ -57,7 +58,7 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
 
     // Flash the actual (wrong) guessed country's outline in red, if it matched a real
     // country — no map flash for unrecognised text (typos/gibberish), per design.
-    const guessedCountry = countries.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+    const guessedCountry = countries.find((c) => normaliseCapital(c.name) === normaliseCapital(name));
     setFlashGuessId(guessedCountry?.id ?? null);
     setFlashSignal((s) => s + 1);
     setFeedback({ tone: 'wrong', label: 'Wrong' });
@@ -83,7 +84,7 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <QuestionHeading>Which country is this?</QuestionHeading>
         <AttemptBadge current={tryNumber} max={MAX_TRIES} />
       </div>
@@ -96,7 +97,6 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
         flashGuessId={flashGuessId}
         flashSignal={flashSignal}
       />
-      {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
       {onFinalTry && !feedback && (
         <p className="text-xs text-slate-400">Last try — outline revealed on the map</p>
       )}
@@ -137,6 +137,7 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
         )}
       </div>
       <div className="flex items-center gap-2">
+        {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
         <button
           type="button"
           onClick={() => submit(query)}

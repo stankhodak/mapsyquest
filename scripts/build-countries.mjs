@@ -19,6 +19,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import worldCountries from 'world-countries';
 import cities from 'all-the-cities';
+import * as topojson from 'topojson-client';
+import countriesTopology from 'world-atlas/countries-50m.json' with { type: 'json' };
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FLAG_SOURCE_DIR = path.join(ROOT, 'node_modules', 'country-flag-icons', '3x2');
@@ -46,6 +48,122 @@ for (const city of cities) {
   }
 }
 
+// world-countries' `latlng` is a hand-picked centroid that, for split/archipelago
+// countries (e.g. Equatorial Guinea's mainland + Bioko island), can land in open
+// water between landmasses — see the "map pin sits in the water" bug report. To
+// guarantee the country-step map pin sits on actual land, we instead compute a
+// centroid from the real admin-0 polygon geometry (same source as
+// build-country-shapes.mjs), restricted to the country's single largest landmass.
+
+/**
+ * Countries/landmasses straddling the antimeridian (Fiji, Kiribati) have rings
+ * whose longitudes flip between ~180 and ~-180, which breaks the area/centroid
+ * math below (it treats the ring as spanning the entire globe). Detect that and
+ * shift negative longitudes by +360 so the ring is contiguous; the caller wraps
+ * the final result back into [-180, 180] with wrapLng.
+ */
+function unwrapRingLongitudes(ring) {
+  const lngs = ring.map(([lng]) => lng);
+  const spread = Math.max(...lngs) - Math.min(...lngs);
+  if (spread <= 180) return ring;
+  return ring.map(([lng, lat]) => [lng < 0 ? lng + 360 : lng, lat]);
+}
+
+function wrapLng(lng) {
+  return ((((lng + 180) % 360) + 360) % 360) - 180;
+}
+
+/** Shoelace-formula signed area of a ring (positive = counter-clockwise winding). */
+function ringSignedArea(ring) {
+  let area = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[(i + 1) % ring.length];
+    area += x1 * y2 - x2 * y1;
+  }
+  return area / 2;
+}
+
+/** Area-weighted polygon centroid (the "center of mass" of the ring's interior). */
+function ringCentroid(ring) {
+  let cx = 0;
+  let cy = 0;
+  let area = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[(i + 1) % ring.length];
+    const cross = x1 * y2 - x2 * y1;
+    area += cross;
+    cx += (x1 + x2) * cross;
+    cy += (y1 + y2) * cross;
+  }
+  area /= 2;
+  if (Math.abs(area) < 1e-12) {
+    const n = ring.length;
+    const sum = ring.reduce((acc, [x, y]) => [acc[0] + x, acc[1] + y], [0, 0]);
+    return [sum[0] / n, sum[1] / n];
+  }
+  return [cx / (6 * area), cy / (6 * area)];
+}
+
+/** Ray-casting point-in-polygon test against a single ring. */
+function pointInRing([px, py], ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/** The (antimeridian-unwrapped) outer ring of whichever polygon part has the largest area. */
+function largestOuterRing(geometry) {
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+  let best = null;
+  let bestArea = -Infinity;
+  for (const polygonCoords of polygons) {
+    const ring = unwrapRingLongitudes(polygonCoords[0]);
+    const area = Math.abs(ringSignedArea(ring));
+    if (area > bestArea) {
+      bestArea = area;
+      best = ring;
+    }
+  }
+  return best;
+}
+
+/**
+ * A point guaranteed to sit on the country's largest landmass: the area centroid
+ * of its outer ring, falling back to the vertex average, then a boundary vertex,
+ * for the rare concave shape where the centroid itself lands outside the ring.
+ */
+function computeLandCenter(geometry) {
+  const outerRing = largestOuterRing(geometry);
+  const centroid = ringCentroid(outerRing);
+  let point = centroid;
+
+  if (!pointInRing(point, outerRing)) {
+    const n = outerRing.length;
+    const sum = outerRing.reduce((acc, [x, y]) => [acc[0] + x, acc[1] + y], [0, 0]);
+    const vertexAverage = [sum[0] / n, sum[1] / n];
+    point = pointInRing(vertexAverage, outerRing) ? vertexAverage : outerRing[0];
+  }
+
+  return { lat: point[1], lng: wrapLng(point[0]) };
+}
+
+const countryGeometries = countriesTopology.objects.countries.geometries;
+function landCenterFor(ccn3) {
+  const geom = countryGeometries.find((g) => g.id === ccn3);
+  if (!geom) return null;
+  const feature = topojson.feature(countriesTopology, { type: 'GeometryCollection', geometries: [geom] });
+  const geometry = feature.features ? feature.features[0].geometry : feature.geometry;
+  const { lat, lng } = computeLandCenter(geometry);
+  return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
+}
+
 function estimateMapZoom(areaKm2) {
   const area = Math.max(areaKm2, 0.1);
   const zoom = 12.5 - 1.45 * Math.log10(area);
@@ -63,7 +181,7 @@ function toCountryRecord(source) {
     name: source.name.common,
     capital: source.capital[0],
     region: source.region,
-    center: { lat: source.latlng[0], lng: source.latlng[1] },
+    center: landCenterFor(source.ccn3) ?? { lat: source.latlng[0], lng: source.latlng[1] },
     capitalCoords,
     mapZoom: estimateMapZoom(source.area),
     settlementCount: FEW_SETTLEMENTS.has(id) ? 'few' : 'many',

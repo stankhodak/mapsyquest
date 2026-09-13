@@ -35,7 +35,7 @@ export function AttemptBadge({ current, max, tone, label }: AttemptBadgeProps) {
   const resolvedTone = tone ?? deriveAttemptTone(current);
   return (
     <span
-      className={`inline-flex items-center rounded-full px-4 py-1.5 text-base font-extrabold ${ATTEMPT_TONE_CLASSES[resolvedTone]}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-4 py-1.5 text-base font-extrabold ${ATTEMPT_TONE_CLASSES[resolvedTone]}`}
     >
       {label ?? `Attempt ${current} of ${max}`}
     </span>
@@ -44,7 +44,7 @@ export function AttemptBadge({ current, max, tone, label }: AttemptBadgeProps) {
 
 export function QuestionHeading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="inline-block rounded-full border border-emerald-500/30 bg-emerald-500/15 px-4 py-1.5 text-base font-medium text-slate-100">
+    <h2 className="min-w-0 truncate rounded-full border border-emerald-500/30 bg-emerald-500/15 px-4 py-1.5 text-base font-medium text-slate-100">
       {children}
     </h2>
   );
@@ -61,7 +61,7 @@ const FEEDBACK_TONE_CLASSES: Record<FeedbackTone, string> = {
 export function FeedbackBadge({ tone, children }: { tone: FeedbackTone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide ${FEEDBACK_TONE_CLASSES[tone]}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide ${FEEDBACK_TONE_CLASSES[tone]}`}
     >
       {children}
     </span>
