@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tryFraction } from '../lib/points';
-import { scoreCapitalGuess } from '../lib/scoring';
-import { AttemptBadge, FeedbackBadge, QuestionHeading, type FeedbackTone } from './Badge';
+import { AttemptBadge, QuestionHeading } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CapitalGuessResult {
@@ -16,54 +16,66 @@ interface CapitalStepProps {
   onComplete: (result: CapitalGuessResult) => void;
 }
 
-const MAX_TRIES = 3;
-const FEEDBACK_DELAY_MS = 900;
+const MAX_TRIES = 2;
+const OPTION_COUNT = 16;
+const REVEAL_DELAY_MS = 900;
 /** Tighter than the country step's hint margin, so the country fills most of the frame. */
 const OUTLINE_PADDING_FRACTION = 0.12;
 
-interface Feedback {
-  tone: FeedbackTone;
-  label: string;
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
-  const [value, setValue] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
+  const [wrongIds, setWrongIds] = useState<string[]>([]);
+  const [resolved, setResolved] = useState(false);
   const [locked, setLocked] = useState(false);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  function submit() {
-    if (!value.trim() || locked) return;
-    const { score: similarity, isStar } = scoreCapitalGuess(value, answer.capital);
-    setLocked(true);
+  // Distractors favour the answer's own region (same-region capitals are a more
+  // plausible/harder mix), topped up with capitals from elsewhere if the region
+  // doesn't have enough other countries (e.g. Oceania).
+  const options = useMemo(() => {
+    const rest = countries.filter((c) => c.id !== answer.id);
+    const sameRegion = shuffle(rest.filter((c) => c.region === answer.region));
+    const otherRegion = shuffle(rest.filter((c) => c.region !== answer.region));
+    const distractors = [...sameRegion, ...otherRegion].slice(0, OPTION_COUNT - 1);
+    return shuffle([...distractors, answer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answer.id]);
 
-    // A strong (≥95%) guess locks in immediately; anything weaker keeps trying until
-    // tries run out, at which point the last guess's similarity (already floored to 0
-    // below the 60% wrong-threshold) is what gets scored.
-    if (isStar || tryNumber >= MAX_TRIES) {
-      const score = Math.round(MAX_SCORE.capital * tryFraction(tryNumber) * (similarity / 100));
-      setFeedback(
-        isStar
-          ? { tone: 'correct', label: 'Correct!' }
-          : similarity > 0
-            ? { tone: 'close', label: 'So Close!' }
-            : { tone: 'wrong', label: 'Wrong' },
-      );
-      window.setTimeout(() => onComplete({ guess: value, score, isStar }), FEEDBACK_DELAY_MS);
+  function pick(option: Country) {
+    if (locked || wrongIds.includes(option.id)) return;
+
+    if (option.id === answer.id) {
+      setLocked(true);
+      setResolved(true);
+      const score = Math.round(MAX_SCORE.capital * tryFraction(tryNumber));
+      window.setTimeout(() => onComplete({ guess: option.capital, score, isStar: true }), REVEAL_DELAY_MS);
       return;
     }
 
-    setFeedback(similarity > 0 ? { tone: 'close', label: 'So Close!' } : { tone: 'wrong', label: 'Wrong' });
-    window.setTimeout(() => {
-      setTryNumber((t) => t + 1);
-      setValue('');
-      setLocked(false);
-      setFeedback(null);
-    }, FEEDBACK_DELAY_MS);
+    if (tryNumber >= MAX_TRIES) {
+      setLocked(true);
+      setResolved(true);
+      setWrongIds((prev) => [...prev, option.id]);
+      window.setTimeout(() => onComplete({ guess: option.capital, score: 0, isStar: false }), REVEAL_DELAY_MS);
+      return;
+    }
+
+    setWrongIds((prev) => [...prev, option.id]);
+    setTryNumber((t) => t + 1);
   }
 
   function skip() {
     if (locked) return;
+    setLocked(true);
+    setResolved(true);
     onComplete({ guess: '(skipped)', score: 0, isStar: false });
   }
 
@@ -84,43 +96,41 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
         revealName
         labelPosition={answer.center}
       />
-      <input
-        value={value}
-        disabled={locked}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        data-lpignore="true"
-        data-1p-ignore="true"
-        onChange={(e) => {
-          setValue(e.target.value);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') submit();
-        }}
-        placeholder="Type the capital..."
-        className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
-      />
-      <div className="flex items-center gap-2">
-        {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!value.trim() || locked}
-          className="flex-1 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-        >
-          Guess
-        </button>
-        <button
-          type="button"
-          onClick={skip}
-          disabled={locked}
-          className="flex-1 rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
-        >
-          Skip
-        </button>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option) => {
+          const isWrongPick = wrongIds.includes(option.id);
+          const isCorrectOption = option.id === answer.id;
+          const stateClasses = !resolved
+            ? isWrongPick
+              ? 'border-rose-500 bg-rose-500/20 text-rose-300 opacity-60'
+              : 'border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700'
+            : isCorrectOption
+              ? 'border-2 border-emerald-400 bg-emerald-500/30 text-slate-100'
+              : isWrongPick
+                ? 'border-rose-500 bg-rose-500/20 text-rose-300'
+                : 'border-slate-700 text-slate-400 opacity-50';
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              disabled={resolved || isWrongPick}
+              onClick={() => pick(option)}
+              className={`truncate rounded-lg border px-3 py-2 text-sm font-medium transition ${stateClasses}`}
+            >
+              {option.capital}
+            </button>
+          );
+        })}
       </div>
+      <button
+        type="button"
+        onClick={skip}
+        disabled={locked}
+        className="w-full rounded-lg border border-rose-700 px-4 py-2 text-sm font-medium text-rose-400 hover:bg-rose-950 disabled:opacity-40"
+      >
+        Skip
+      </button>
     </div>
   );
 }
