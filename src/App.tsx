@@ -36,10 +36,7 @@ function buildShareText(
     `MapsyQuest — ${dateKey}`,
     `⭐ ${totalStars}/${totalRounds * 3} · ${totalPoints} pts${streakDays > 0 ? ` · 🔥 ${streakDays}` : ''}`,
     '',
-    ...rows.map(
-      (r) =>
-        `${tierEmoji(r.tiers?.country)}${tierEmoji(r.tiers?.capital)}${tierEmoji(r.tiers?.flag)} ${r.points}pts`,
-    ),
+    ...rows.map((r) => `${tierEmoji(r.tiers?.country)}${tierEmoji(r.tiers?.capital)}${tierEmoji(r.tiers?.flag)}`),
   ];
   return lines.join('\n');
 }
