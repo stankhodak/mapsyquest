@@ -155,7 +155,7 @@ function App() {
     <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
       <header className="mx-auto mb-8 max-w-md text-center md:mb-3">
         <h1
-          className="text-4xl font-bold tracking-wide [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] md:text-3xl"
+          className="text-4xl font-bold tracking-wide text-emerald-400 [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] md:text-3xl"
           style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
         >
           MapsyQuest
