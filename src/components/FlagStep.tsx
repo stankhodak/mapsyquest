@@ -3,7 +3,7 @@ import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
 import { MAX_SCORE, tierForTry, type StarTier } from '../lib/points';
-import { AttemptBadge, QuestionHeading, RoundBadge } from './Badge';
+import { AttemptBadge, RoundBadge } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface FlagGuessResult {
@@ -62,11 +62,10 @@ export function FlagStep({ answer, roundNumber, totalRounds, onComplete }: FlagS
 
   return (
     <div className="space-y-4">
-      <div className="relative left-1/2 flex w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
         <RoundBadge>
           Round {roundNumber} of {totalRounds}
         </RoundBadge>
-        <QuestionHeading>Which flag belongs to {answer.name}?</QuestionHeading>
         <AttemptBadge current={1} max={1} tone="red" label="Only One Attempt" />
       </div>
       <MapScope
@@ -80,6 +79,7 @@ export function FlagStep({ answer, roundNumber, totalRounds, onComplete }: FlagS
         revealName
         labelPosition={answer.center}
         capitalName={answer.capital}
+        cornerLabel={`Which flag belongs to ${answer.name}?`}
       />
       <div className="grid grid-cols-5 gap-2">
         {options.map((c) => {

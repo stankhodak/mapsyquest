@@ -38,6 +38,8 @@ interface MapScopeProps {
   showMarker?: boolean;
   /** Show the zoom +/- and reset-view buttons. Defaults to true; off for the start screen's decorative map. */
   showControls?: boolean;
+  /** The round's question ("Which country is this?" etc.), shown as a caption pinned to the map's top-left corner instead of a separate bubble above it. */
+  cornerLabel?: string;
 }
 
 // OpenFreeMap: free vector tiles, no API key, ODbL-licensed OpenStreetMap data.
@@ -211,6 +213,7 @@ export function MapScope({
   flashSignal,
   showMarker = true,
   showControls = true,
+  cornerLabel,
 }: MapScopeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -424,6 +427,11 @@ export function MapScope({
         ref={containerRef}
         className="relative aspect-video w-full touch-none select-none overflow-hidden rounded-xl border border-slate-700 bg-sky-950"
       >
+        {cornerLabel && (
+          <div className="absolute left-2 top-2 z-10 max-w-[65%] rounded-lg bg-slate-800/80 px-2.5 py-1.5 text-sm font-medium leading-tight text-slate-100">
+            {cornerLabel}
+          </div>
+        )}
         {showControls && (
           <>
             <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1">

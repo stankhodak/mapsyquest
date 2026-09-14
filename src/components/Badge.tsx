@@ -42,14 +42,6 @@ export function AttemptBadge({ current, max, tone, label }: AttemptBadgeProps) {
   );
 }
 
-export function QuestionHeading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="min-w-0 flex-1 truncate rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-sm font-medium text-slate-100">
-      {children}
-    </h2>
-  );
-}
-
 export type FeedbackTone = 'correct' | 'close' | 'wrong';
 
 const FEEDBACK_TONE_CLASSES: Record<FeedbackTone, string> = {

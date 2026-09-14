@@ -3,7 +3,7 @@ import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tierForTry, tryFraction, type StarTier } from '../lib/points';
 import { normaliseCapital } from '../lib/scoring';
-import { AttemptBadge, FeedbackBadge, QuestionHeading, RoundBadge, type FeedbackTone } from './Badge';
+import { AttemptBadge, FeedbackBadge, RoundBadge, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CountryGuessResult {
@@ -104,11 +104,10 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
 
   return (
     <div className="space-y-3">
-      <div className="relative left-1/2 flex w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
         <RoundBadge>
           Round {roundNumber} of {totalRounds}
         </RoundBadge>
-        <QuestionHeading>Which country is this?</QuestionHeading>
         <AttemptBadge current={tryNumber} max={MAX_TRIES} />
       </div>
       <MapScope
@@ -119,6 +118,7 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
         fitToOutline={onFinalTry}
         flashGuessId={flashGuessId}
         flashSignal={flashSignal}
+        cornerLabel="Which country is this?"
       />
       {onFinalTry && !feedback && (
         <p className="text-xs text-slate-400">Last try — outline revealed on the map</p>
