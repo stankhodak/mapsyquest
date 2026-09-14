@@ -79,7 +79,7 @@ export function FlagStep({ answer, roundNumber, totalRounds, onComplete }: FlagS
         revealName
         labelPosition={answer.center}
         capitalName={answer.capital}
-        cornerLabel={`Which flag belongs to ${answer.name}?`}
+        cornerLabel="Guess the flag"
       />
       <div className="grid grid-cols-5 gap-2">
         {options.map((c) => {

@@ -40,6 +40,8 @@ interface MapScopeProps {
   showControls?: boolean;
   /** The round's question ("Which country is this?" etc.), shown as a caption pinned to the map's top-left corner instead of a separate bubble above it. */
   cornerLabel?: string;
+  /** Start zoomed out to a wide world view and glide into the round's actual center/zoom, instead of opening already framed. Used for the country step's first look at a new round. */
+  introGlide?: boolean;
 }
 
 // OpenFreeMap: free vector tiles, no API key, ODbL-licensed OpenStreetMap data.
@@ -51,6 +53,11 @@ const BORDER_REVEAL_ZOOM_DELTA = 1.2;
 const MIN_MAP_ZOOM = 1;
 const MAX_MAP_ZOOM = 16;
 const FLASH_DURATION_MS = 900;
+/** Camera travel time for both the flash-to-wrong-country hop and the ease back —
+ * kept equal so neither direction feels like an abrupt pop next to the other. */
+const CAMERA_MOVE_DURATION_MS = 700;
+const INTRO_GLIDE_START_ZOOM = 1.5;
+const INTRO_GLIDE_DURATION_MS = 2000;
 const HINT_COLOR = '#f59e0b';
 const HINT_FILL_OPACITY = 0.25;
 const FLASH_COLOR = '#ef4444';
@@ -109,7 +116,7 @@ function fitToBounds(map: MapLibreMap, bbox: [number, number, number, number], a
       [bbox[0], bbox[1]],
       [bbox[2], bbox[3]],
     ],
-    { padding: 24, duration: animate ? 500 : 0, maxZoom: MAX_MAP_ZOOM },
+    { padding: 24, duration: animate ? CAMERA_MOVE_DURATION_MS : 0, maxZoom: MAX_MAP_ZOOM },
   );
 }
 
@@ -214,6 +221,7 @@ export function MapScope({
   showMarker = true,
   showControls = true,
   cornerLabel,
+  introGlide,
 }: MapScopeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -239,7 +247,7 @@ export function MapScope({
       container,
       style: STYLE_URL,
       center: [center.lng, center.lat],
-      zoom,
+      zoom: introGlide ? INTRO_GLIDE_START_ZOOM : zoom,
       minZoom: MIN_MAP_ZOOM,
       maxZoom: MAX_MAP_ZOOM,
       dragRotate: false,
@@ -253,6 +261,9 @@ export function MapScope({
     map.once('style.load', () => {
       hideAllLabels(map);
       hideBorders(map);
+      if (introGlide) {
+        map.flyTo({ center: [center.lng, center.lat], zoom, duration: INTRO_GLIDE_DURATION_MS });
+      }
     });
 
     if (showMarker) {
@@ -410,7 +421,7 @@ export function MapScope({
       if (revealOutlineRef.current && hintShapeRef.current) {
         fitToBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), true);
       } else {
-        map.easeTo({ center: [center.lng, center.lat], zoom, duration: 500 });
+        map.easeTo({ center: [center.lng, center.lat], zoom, duration: CAMERA_MOVE_DURATION_MS });
       }
     }, FLASH_DURATION_MS);
     return () => window.clearTimeout(timeout);
@@ -428,7 +439,10 @@ export function MapScope({
         className="relative aspect-video w-full touch-none select-none overflow-hidden rounded-xl border border-slate-700 bg-sky-950"
       >
         {cornerLabel && (
-          <div className="absolute left-2 top-2 z-10 max-w-[65%] rounded-lg bg-slate-800/80 px-2.5 py-1.5 text-sm font-medium leading-tight text-slate-100">
+          <div
+            className="absolute left-2 top-2 z-10 max-w-[65%] text-lg font-bold leading-tight tracking-wide text-[#f59e0b] [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] sm:text-xl"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
             {cornerLabel}
           </div>
         )}

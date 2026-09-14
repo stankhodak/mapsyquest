@@ -118,7 +118,8 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
         fitToOutline={onFinalTry}
         flashGuessId={flashGuessId}
         flashSignal={flashSignal}
-        cornerLabel="Which country is this?"
+        cornerLabel="Guess the country"
+        introGlide
       />
       {onFinalTry && !feedback && (
         <p className="text-xs text-slate-400">Last try — outline revealed on the map</p>
