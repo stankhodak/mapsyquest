@@ -90,7 +90,7 @@ export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: Ca
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="relative left-1/2 flex w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 items-center gap-2">
         <RoundBadge>
           Round {roundNumber} of {totalRounds}
         </RoundBadge>
@@ -107,6 +107,7 @@ export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: Ca
         outlinePaddingFraction={OUTLINE_PADDING_FRACTION}
         revealName
         labelPosition={answer.center}
+        capitalName={answer.capital}
       />
       <div className="grid grid-cols-4 gap-1.5">
         {options.map((option) => {

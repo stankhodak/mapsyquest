@@ -4,6 +4,7 @@ import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
 import { MAX_SCORE, tierForTry, type StarTier } from '../lib/points';
 import { AttemptBadge, QuestionHeading, RoundBadge } from './Badge';
+import { MapScope } from './MapScope';
 
 export interface FlagGuessResult {
   guess: string;
@@ -22,6 +23,8 @@ interface FlagStepProps {
 const OPTION_COUNT = 10;
 /** Only one attempt — a single wrong flag ends the step, unlike country/capital's 3 tries. */
 const REVEAL_DELAY_MS = 900;
+/** Matches the capital step's tighter hint margin, so the country fills most of the frame. */
+const OUTLINE_PADDING_FRACTION = 0.12;
 
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
@@ -59,13 +62,25 @@ export function FlagStep({ answer, roundNumber, totalRounds, onComplete }: FlagS
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="relative left-1/2 flex w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 items-center gap-2">
         <RoundBadge>
           Round {roundNumber} of {totalRounds}
         </RoundBadge>
         <QuestionHeading>Which flag belongs to {answer.name}?</QuestionHeading>
         <AttemptBadge current={1} max={1} tone="red" label="Only One Attempt" />
       </div>
+      <MapScope
+        center={answer.capitalCoords}
+        zoom={answer.mapZoom + 1}
+        countryId={answer.id}
+        countryName={answer.name}
+        revealOutline
+        fitToOutline
+        outlinePaddingFraction={OUTLINE_PADDING_FRACTION}
+        revealName
+        labelPosition={answer.center}
+        capitalName={answer.capital}
+      />
       <div className="grid grid-cols-5 gap-2">
         {options.map((c) => {
           const isRevealed = selected !== null;

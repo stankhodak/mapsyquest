@@ -24,10 +24,12 @@ interface MapScopeProps {
   fitToOutline?: boolean;
   /** Fraction of the outline's own width/height added as margin per side when fitting to it (e.g. 0.15 = 30% larger box). Defaults to a generous hint-reveal margin; the capital step uses a tighter value so the country fills more of the frame. */
   outlinePaddingFraction?: number;
-  /** Show the country name as an on-map label at labelPosition (capital step only). */
+  /** Show the country name as an on-map label at labelPosition (capital/flag steps). */
   revealName?: boolean;
   /** Where to place the name label — the country's own centroid, not necessarily `center` (which may be the capital's pin). Required when revealName is set. */
   labelPosition?: LatLng;
+  /** Also show a smaller capital-name caption right at the pin (`center`). Optional even when revealName is set — the country step's final-try reveal doesn't use it. */
+  capitalName?: string;
   /** ISO alpha-2 id of the country the player actually guessed (wrong), if it matched a real country. Bump flashSignal to trigger a red flash of ITS outline; if this has no shape data, no flash occurs. */
   flashGuessId?: string | null;
   /** Bump to trigger the wrong-guess flash described above. */
@@ -72,6 +74,16 @@ function hideAllLabels(map: MapLibreMap) {
 function revealBordersPast(map: MapLibreMap, startZoom: number) {
   for (const id of BORDER_LAYER_IDS) {
     if (map.getLayer(id)) map.setLayerZoomRange(id, startZoom + BORDER_REVEAL_ZOOM_DELTA, 24);
+  }
+}
+
+/** Zoom range past MAX_MAP_ZOOM, so the layer can never actually render — used while the
+ * round hasn't earned its hint yet, so a player can't bypass "no borders" by just zooming
+ * the base map in (independent of the amber hint outline, which is the only sanctioned way
+ * to see a country's real shape). */
+function hideBorders(map: MapLibreMap) {
+  for (const id of BORDER_LAYER_IDS) {
+    if (map.getLayer(id)) map.setLayerZoomRange(id, MAX_MAP_ZOOM + 1, 24);
   }
 }
 
@@ -152,6 +164,21 @@ function createLabelElement(text: string): HTMLDivElement {
   return el;
 }
 
+/** Smaller companion label for the capital city name, styled like a map pin caption
+ * rather than the bold country-name banner above. */
+function createCapitalLabelElement(text: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.textContent = text;
+  el.style.fontFamily = 'Georgia, "Times New Roman", serif';
+  el.style.fontWeight = '700';
+  el.style.fontSize = '13px';
+  el.style.color = '#1e293b';
+  el.style.textShadow = '0 0 4px #fff, 0 0 4px #fff, 0 0 6px #fff';
+  el.style.pointerEvents = 'none';
+  el.style.whiteSpace = 'nowrap';
+  return el;
+}
+
 /** Module-level cache: the generated shape dataset is ~270KB, so it's dynamically
  * imported (its own chunk, not the main bundle) and fetched only once per session. */
 let shapesPromise: Promise<typeof import('../data/countryShapes.generated')> | null = null;
@@ -179,6 +206,7 @@ export function MapScope({
   outlinePaddingFraction = DEFAULT_OUTLINE_PADDING_FRACTION,
   revealName,
   labelPosition,
+  capitalName,
   flashGuessId,
   flashSignal,
   showMarker = true,
@@ -188,6 +216,7 @@ export function MapScope({
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const labelMarkerRef = useRef<Marker | null>(null);
+  const capitalLabelMarkerRef = useRef<Marker | null>(null);
   const shapesRecordRef = useRef<Record<string, Shape> | null>(null);
   const hintShapeRef = useRef<Shape | null>(null);
   const layersReadyRef = useRef(false);
@@ -220,7 +249,7 @@ export function MapScope({
 
     map.once('style.load', () => {
       hideAllLabels(map);
-      revealBordersPast(map, zoom);
+      hideBorders(map);
     });
 
     if (showMarker) {
@@ -229,8 +258,26 @@ export function MapScope({
     mapRef.current = map;
 
     if (revealName && labelPosition && countryName) {
-      labelMarkerRef.current = new Marker({ element: createLabelElement(countryName), anchor: 'center' })
+      // Offset well clear of the pin: labelPosition (country centroid) and center (the
+      // pin's own coordinate, usually the capital) can sit very close together for
+      // compact countries, which would otherwise render the label right on top of the
+      // pin's teardrop body.
+      labelMarkerRef.current = new Marker({
+        element: createLabelElement(countryName),
+        anchor: 'center',
+        offset: [0, -28],
+      })
         .setLngLat([labelPosition.lng, labelPosition.lat])
+        .addTo(map);
+    }
+
+    if (revealName && capitalName) {
+      capitalLabelMarkerRef.current = new Marker({
+        element: createCapitalLabelElement(capitalName),
+        anchor: 'top',
+        offset: [0, 12],
+      })
+        .setLngLat([center.lng, center.lat])
         .addTo(map);
     }
 
@@ -301,10 +348,12 @@ export function MapScope({
       cancelled = true;
       markerRef.current?.remove();
       labelMarkerRef.current?.remove();
+      capitalLabelMarkerRef.current?.remove();
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
       labelMarkerRef.current = null;
+      capitalLabelMarkerRef.current = null;
       layersReadyRef.current = false;
     };
     // Each round/step renders its own MapScope instance (see RoundFlow's per-round `key`
@@ -315,16 +364,21 @@ export function MapScope({
   }, []);
 
   // Show/hide the persistent outline hint (country step's 3rd-try hint; capital step).
+  // The base map's own admin-boundary lines are tied to the same on/off switch — they're
+  // as much a hint as the amber outline is (see hideBorders), so they only ever become
+  // zoomable-into once the round has actually earned that hint, not just from zooming in.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !layersReadyRef.current) return;
     if (revealOutline) {
       setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, HINT_FILL_OPACITY);
+      revealBordersPast(map, zoom);
       if (fitToOutline && hintShapeRef.current) {
         fitToBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), true);
       }
     } else {
       setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, 0);
+      hideBorders(map);
     }
     // layersReadyTick isn't read here, but bumping it re-runs this effect once the
     // (async-loaded) outline layers exist, applying whatever revealOutline already was.
