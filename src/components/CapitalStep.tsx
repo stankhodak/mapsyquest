@@ -128,7 +128,7 @@ export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: Ca
               type="button"
               disabled={resolved || isWrongPick}
               onClick={() => pick(option)}
-              className={`truncate rounded-lg border px-1.5 py-2 text-xs font-medium transition ${stateClasses}`}
+              className={`flex min-h-11 items-center justify-center rounded-lg border px-1.5 py-2 text-center text-xs font-medium leading-tight transition ${stateClasses}`}
             >
               {option.capital}
             </button>
