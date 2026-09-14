@@ -1,19 +1,22 @@
 import { useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
-import { MAX_SCORE, tryFraction } from '../lib/points';
+import { MAX_SCORE, tierForTry, tryFraction, type StarTier } from '../lib/points';
 import { normaliseCapital } from '../lib/scoring';
-import { AttemptBadge, FeedbackBadge, QuestionHeading, type FeedbackTone } from './Badge';
+import { AttemptBadge, FeedbackBadge, QuestionHeading, RoundBadge, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CountryGuessResult {
   guess: string;
   isCorrect: boolean;
   score: number;
+  tier: StarTier;
 }
 
 interface CountryStepProps {
   answer: Country;
+  roundNumber: number;
+  totalRounds: number;
   onComplete: (result: CountryGuessResult) => void;
 }
 
@@ -28,7 +31,7 @@ interface Feedback {
   label: string;
 }
 
-export function CountryStep({ answer, onComplete }: CountryStepProps) {
+export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: CountryStepProps) {
   const [query, setQuery] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
   const [flashSignal, setFlashSignal] = useState(0);
@@ -52,7 +55,10 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
     if (isCorrect) {
       const score = Math.round(MAX_SCORE.country * tryFraction(tryNumber));
       setFeedback({ tone: 'correct', label: 'Correct!' });
-      window.setTimeout(() => onComplete({ guess: name, isCorrect: true, score }), FEEDBACK_DELAY_MS);
+      window.setTimeout(
+        () => onComplete({ guess: name, isCorrect: true, score, tier: tierForTry(tryNumber) }),
+        FEEDBACK_DELAY_MS,
+      );
       return;
     }
 
@@ -64,7 +70,10 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
     setFeedback({ tone: 'wrong', label: 'Wrong' });
 
     if (tryNumber >= MAX_TRIES) {
-      window.setTimeout(() => onComplete({ guess: name, isCorrect: false, score: 0 }), FEEDBACK_DELAY_MS);
+      window.setTimeout(
+        () => onComplete({ guess: name, isCorrect: false, score: 0, tier: null }),
+        FEEDBACK_DELAY_MS,
+      );
     } else {
       window.setTimeout(() => {
         setTryNumber((t) => t + 1);
@@ -77,14 +86,17 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
 
   function skip() {
     if (locked) return;
-    onComplete({ guess: '(skipped)', isCorrect: false, score: 0 });
+    onComplete({ guess: '(skipped)', isCorrect: false, score: 0, tier: null });
   }
 
   const onFinalTry = tryNumber >= MAX_TRIES;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <RoundBadge>
+          Round {roundNumber} of {totalRounds}
+        </RoundBadge>
         <QuestionHeading>Which country is this?</QuestionHeading>
         <AttemptBadge current={tryNumber} max={MAX_TRIES} />
       </div>
@@ -100,44 +112,59 @@ export function CountryStep({ answer, onComplete }: CountryStepProps) {
       {onFinalTry && !feedback && (
         <p className="text-xs text-slate-400">Last try — outline revealed on the map</p>
       )}
-      <div className="relative">
-        <input
-          autoFocus
-          value={query}
-          disabled={locked}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          data-lpignore="true"
-          data-1p-ignore="true"
-          onChange={(e) => {
-            setQuery(e.target.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit(query);
-          }}
-          placeholder="Type a country name..."
-          className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
-        />
-        {matches.length > 0 && !locked && (
-          <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-slate-600 bg-slate-800 shadow-lg">
-            {matches.map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => submit(c.name)}
-                  className="block w-full px-4 py-2 text-left text-slate-100 hover:bg-slate-700"
-                >
-                  {c.name}
-                </button>
-              </li>
-            ))}
-          </ul>
+      {/* Desktop: the feedback badge sits to the left of the input, in its own
+          fixed-width slot, so it never nudges the Guess/Skip buttons below. Mobile
+          has no room to spare for that, so it stays inline with Guess/Skip instead
+          (see the button row below) — same badge, shown in only one slot at a time. */}
+      <div className="flex items-center gap-2">
+        {feedback && (
+          <div className="hidden shrink-0 md:block">
+            <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>
+          </div>
         )}
+        <div className="relative min-w-0 flex-1">
+          <input
+            autoFocus
+            value={query}
+            disabled={locked}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-lpignore="true"
+            data-1p-ignore="true"
+            onChange={(e) => {
+              setQuery(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submit(query);
+            }}
+            placeholder="Type a country name..."
+            className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
+          />
+          {matches.length > 0 && !locked && (
+            <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-slate-600 bg-slate-800 shadow-lg">
+              {matches.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => submit(c.name)}
+                    className="block w-full px-4 py-2 text-left text-slate-100 hover:bg-slate-700"
+                  >
+                    {c.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-2">
-        {feedback && <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>}
+        {feedback && (
+          <div className="shrink-0 md:hidden">
+            <FeedbackBadge tone={feedback.tone}>{feedback.label}</FeedbackBadge>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => submit(query)}

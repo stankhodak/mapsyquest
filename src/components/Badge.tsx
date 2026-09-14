@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export function RoundBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full bg-slate-800 px-4 py-1.5 text-base font-extrabold text-slate-100">
+    <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-slate-800 px-3 py-1 text-sm font-extrabold text-slate-100">
       {children}
     </span>
   );
@@ -35,7 +35,7 @@ export function AttemptBadge({ current, max, tone, label }: AttemptBadgeProps) {
   const resolvedTone = tone ?? deriveAttemptTone(current);
   return (
     <span
-      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-4 py-1.5 text-base font-extrabold ${ATTEMPT_TONE_CLASSES[resolvedTone]}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1 text-sm font-extrabold ${ATTEMPT_TONE_CLASSES[resolvedTone]}`}
     >
       {label ?? `Attempt ${current} of ${max}`}
     </span>
@@ -44,7 +44,7 @@ export function AttemptBadge({ current, max, tone, label }: AttemptBadgeProps) {
 
 export function QuestionHeading({ children }: { children: ReactNode }) {
   return (
-    <h2 className="min-w-0 truncate rounded-full border border-emerald-500/30 bg-emerald-500/15 px-4 py-1.5 text-base font-medium text-slate-100">
+    <h2 className="min-w-0 flex-1 truncate rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-sm font-medium text-slate-100">
       {children}
     </h2>
   );

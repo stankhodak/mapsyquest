@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import type { Country } from '../data/types';
-import { starMultiplier } from '../lib/points';
+import { starMultiplier, tierEmoji, type StarTier } from '../lib/points';
 import { RoundBadge } from './Badge';
 import { CapitalStep, type CapitalGuessResult } from './CapitalStep';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
 import { FlagStep, type FlagGuessResult } from './FlagStep';
+
+export interface RoundTiers {
+  country: StarTier;
+  capital: StarTier;
+  flag: StarTier;
+}
 
 export interface RoundResult {
   country: Country;
@@ -13,6 +19,7 @@ export interface RoundResult {
   flagGuess: FlagGuessResult;
   stars: number;
   points: number;
+  tiers: RoundTiers;
 }
 
 interface RoundFlowProps {
@@ -56,36 +63,59 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
 
   function finishRound() {
     if (!countryGuess || !capitalGuess || !flagGuess) return;
-    onRoundComplete({ country, countryGuess, capitalGuess, flagGuess, stars, points: roundPoints });
+    const tiers: RoundTiers = { country: countryGuess.tier, capital: capitalGuess.tier, flag: flagGuess.tier };
+    onRoundComplete({ country, countryGuess, capitalGuess, flagGuess, stars, points: roundPoints, tiers });
   }
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
-      <RoundBadge>
-        Round {roundNumber} of {totalRounds}
-      </RoundBadge>
-
-      {step === 'country' && <CountryStep answer={country} onComplete={handleCountryComplete} />}
-      {step === 'capital' && <CapitalStep answer={country} onComplete={handleCapitalComplete} />}
-      {step === 'flag' && <FlagStep answer={country} onComplete={handleFlagComplete} />}
+      {step === 'country' && (
+        <CountryStep
+          answer={country}
+          roundNumber={roundNumber}
+          totalRounds={totalRounds}
+          onComplete={handleCountryComplete}
+        />
+      )}
+      {step === 'capital' && (
+        <CapitalStep
+          answer={country}
+          roundNumber={roundNumber}
+          totalRounds={totalRounds}
+          onComplete={handleCapitalComplete}
+        />
+      )}
+      {step === 'flag' && (
+        <FlagStep
+          answer={country}
+          roundNumber={roundNumber}
+          totalRounds={totalRounds}
+          onComplete={handleFlagComplete}
+        />
+      )}
 
       {step === 'summary' && countryGuess && capitalGuess && flagGuess && (
         <div className="space-y-4">
+          <RoundBadge>
+            Round {roundNumber} of {totalRounds}
+          </RoundBadge>
           <h2 className="text-lg font-medium text-slate-100">
             {country.name} — {country.capital}
           </h2>
           <ul className="space-y-1 text-sm text-slate-300">
             <li>
-              Country:{' '}
+              Country: {tierEmoji(countryGuess.tier)}{' '}
               {countryGuess.isCorrect
-                ? `⭐ correct (${countryGuess.score} pts)`
-                : `✗ (you said "${countryGuess.guess}")`}
+                ? `correct (${countryGuess.score} pts)`
+                : `(you said "${countryGuess.guess}")`}
             </li>
             <li>
-              Capital: {capitalGuess.isStar ? '⭐ ' : ''}
-              {capitalGuess.score} pts (you said "{capitalGuess.guess}") — correct: {country.capital}
+              Capital: {tierEmoji(capitalGuess.tier)} {capitalGuess.score} pts (you said "{capitalGuess.guess}") —
+              correct: {country.capital}
             </li>
-            <li>Flag: {flagGuess.isCorrect ? `⭐ correct (${flagGuess.score} pts)` : '✗ incorrect'}</li>
+            <li>
+              Flag: {tierEmoji(flagGuess.tier)} {flagGuess.isCorrect ? `correct (${flagGuess.score} pts)` : 'incorrect'}
+            </li>
           </ul>
           <p className="text-base font-semibold text-slate-100">
             {stars} {stars === 1 ? 'star' : 'stars'} · {roundPoints} points ({multiplier}x)

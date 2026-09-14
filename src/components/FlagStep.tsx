@@ -2,17 +2,20 @@ import { useMemo, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
-import { MAX_SCORE } from '../lib/points';
-import { AttemptBadge, QuestionHeading } from './Badge';
+import { MAX_SCORE, tierForTry, type StarTier } from '../lib/points';
+import { AttemptBadge, QuestionHeading, RoundBadge } from './Badge';
 
 export interface FlagGuessResult {
   guess: string;
   isCorrect: boolean;
   score: number;
+  tier: StarTier;
 }
 
 interface FlagStepProps {
   answer: Country;
+  roundNumber: number;
+  totalRounds: number;
   onComplete: (result: FlagGuessResult) => void;
 }
 
@@ -29,7 +32,7 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-export function FlagStep({ answer, onComplete }: FlagStepProps) {
+export function FlagStep({ answer, roundNumber, totalRounds, onComplete }: FlagStepProps) {
   const [selected, setSelected] = useState<string | null>(null);
 
   // Distractors are plain random picks for now; the instructions doc flags
@@ -48,12 +51,18 @@ export function FlagStep({ answer, onComplete }: FlagStepProps) {
     setSelected(id);
     const isCorrect = id === answer.id;
     const score = isCorrect ? MAX_SCORE.flag : 0;
-    window.setTimeout(() => onComplete({ guess: id, isCorrect, score }), REVEAL_DELAY_MS);
+    window.setTimeout(
+      () => onComplete({ guess: id, isCorrect, score, tier: isCorrect ? tierForTry(1) : null }),
+      REVEAL_DELAY_MS,
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <RoundBadge>
+          Round {roundNumber} of {totalRounds}
+        </RoundBadge>
         <QuestionHeading>Which flag belongs to {answer.name}?</QuestionHeading>
         <AttemptBadge current={1} max={1} tone="red" label="Only One Attempt" />
       </div>

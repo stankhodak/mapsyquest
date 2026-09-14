@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { RoundFlow, type RoundResult } from './components/RoundFlow';
+import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
 import { StartScreen } from './components/StartScreen';
 import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
+import { tierEmoji } from './lib/points';
 import {
   clearDailyRecord,
   loadDailyRecord,
@@ -17,10 +18,12 @@ interface SummaryRow {
   countryName: string;
   stars: number;
   points: number;
+  tiers?: RoundTiers;
 }
 
-// Spoiler-free by design: no country/capital names, just the per-round star blocks
-// and points (Wordle-style), so sharing doesn't give away any of the day's answers.
+// Spoiler-free by design: no country/capital names, just the per-round tier medals
+// (country/capital/flag) and points (Wordle-style), so sharing doesn't give away any
+// of the day's answers.
 function buildShareText(
   dateKey: string,
   totalStars: number,
@@ -33,7 +36,10 @@ function buildShareText(
     `MapsyQuest — ${dateKey}`,
     `⭐ ${totalStars}/${totalRounds * 3} · ${totalPoints} pts${streakDays > 0 ? ` · 🔥 ${streakDays}` : ''}`,
     '',
-    ...rows.map((r) => `${'⭐'.repeat(r.stars)}${'⬛'.repeat(3 - r.stars)} ${r.points}pts`),
+    ...rows.map(
+      (r) =>
+        `${tierEmoji(r.tiers?.country)}${tierEmoji(r.tiers?.capital)}${tierEmoji(r.tiers?.flag)} ${r.points}pts`,
+    ),
   ];
   return lines.join('\n');
 }
@@ -89,6 +95,7 @@ function App() {
             countryName: r.country.name,
             stars: r.stars,
             points: r.points,
+            tiers: r.tiers,
           })),
           totalStars: next.reduce((sum, r) => sum + r.stars, 0),
           totalPoints: next.reduce((sum, r) => sum + r.points, 0),
@@ -142,14 +149,15 @@ function App() {
       countryName: r.country.name,
       stars: r.stars,
       points: r.points,
+      tiers: r.tiers,
     }));
   const totalStars = storedRecord?.totalStars ?? results.reduce((sum, r) => sum + r.stars, 0);
   const totalPoints = storedRecord?.totalPoints ?? results.reduce((sum, r) => sum + r.points, 0);
 
   return (
-    <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100">
-      <header className="mx-auto mb-8 max-w-md text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">MapsyQuest</h1>
+    <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
+      <header className="mx-auto mb-8 max-w-md text-center md:mb-3">
+        <h1 className="text-3xl font-semibold tracking-tight md:text-2xl">MapsyQuest</h1>
         <p className="text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
       </header>
 
@@ -191,7 +199,11 @@ function App() {
               {summaryRows.map((r) => (
                 <li key={r.countryId} className="contents">
                   <span className="truncate font-medium text-slate-100">{r.countryName}</span>
-                  <span className="text-right">{r.stars}⭐</span>
+                  <span className="text-right">
+                    {tierEmoji(r.tiers?.country)}
+                    {tierEmoji(r.tiers?.capital)}
+                    {tierEmoji(r.tiers?.flag)}
+                  </span>
                   <span className="text-right">{r.points} pts</span>
                 </li>
               ))}

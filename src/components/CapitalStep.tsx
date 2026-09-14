@@ -1,18 +1,21 @@
 import { useMemo, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
-import { MAX_SCORE, tryFraction } from '../lib/points';
-import { AttemptBadge, QuestionHeading } from './Badge';
+import { MAX_SCORE, tierForTry, tryFraction, type StarTier } from '../lib/points';
+import { AttemptBadge, QuestionHeading, RoundBadge } from './Badge';
 import { MapScope } from './MapScope';
 
 export interface CapitalGuessResult {
   guess: string;
   score: number;
   isStar: boolean;
+  tier: StarTier;
 }
 
 interface CapitalStepProps {
   answer: Country;
+  roundNumber: number;
+  totalRounds: number;
   onComplete: (result: CapitalGuessResult) => void;
 }
 
@@ -31,7 +34,7 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
+export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: CapitalStepProps) {
   const [tryNumber, setTryNumber] = useState(1);
   const [wrongIds, setWrongIds] = useState<string[]>([]);
   const [resolved, setResolved] = useState(false);
@@ -56,7 +59,10 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
       setLocked(true);
       setResolved(true);
       const score = Math.round(MAX_SCORE.capital * tryFraction(tryNumber));
-      window.setTimeout(() => onComplete({ guess: option.capital, score, isStar: true }), REVEAL_DELAY_MS);
+      window.setTimeout(
+        () => onComplete({ guess: option.capital, score, isStar: true, tier: tierForTry(tryNumber) }),
+        REVEAL_DELAY_MS,
+      );
       return;
     }
 
@@ -64,7 +70,10 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
       setLocked(true);
       setResolved(true);
       setWrongIds((prev) => [...prev, option.id]);
-      window.setTimeout(() => onComplete({ guess: option.capital, score: 0, isStar: false }), REVEAL_DELAY_MS);
+      window.setTimeout(
+        () => onComplete({ guess: option.capital, score: 0, isStar: false, tier: null }),
+        REVEAL_DELAY_MS,
+      );
       return;
     }
 
@@ -76,12 +85,15 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
     if (locked) return;
     setLocked(true);
     setResolved(true);
-    onComplete({ guess: '(skipped)', score: 0, isStar: false });
+    onComplete({ guess: '(skipped)', score: 0, isStar: false, tier: null });
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <RoundBadge>
+          Round {roundNumber} of {totalRounds}
+        </RoundBadge>
         <QuestionHeading>What's the capital of {answer.name}?</QuestionHeading>
         <AttemptBadge current={tryNumber} max={MAX_TRIES} />
       </div>
@@ -96,7 +108,7 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
         revealName
         labelPosition={answer.center}
       />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-4 gap-1.5">
         {options.map((option) => {
           const isWrongPick = wrongIds.includes(option.id);
           const isCorrectOption = option.id === answer.id;
@@ -116,7 +128,7 @@ export function CapitalStep({ answer, onComplete }: CapitalStepProps) {
               type="button"
               disabled={resolved || isWrongPick}
               onClick={() => pick(option)}
-              className={`truncate rounded-lg border px-3 py-2 text-sm font-medium transition ${stateClasses}`}
+              className={`truncate rounded-lg border px-1.5 py-2 text-xs font-medium transition ${stateClasses}`}
             >
               {option.capital}
             </button>

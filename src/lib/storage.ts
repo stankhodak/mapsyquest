@@ -4,6 +4,7 @@
  * can throw (private browsing, blocked storage, quota) and a missing streak
  * shouldn't break the game.
  */
+import type { StarTier } from './points';
 
 const RESULT_KEY_PREFIX = 'mapsyquest:result:';
 const STREAK_KEY = 'mapsyquest:streak';
@@ -13,6 +14,10 @@ export interface StoredRoundResult {
   countryName: string;
   stars: number;
   points: number;
+  /** Per-category medal tiers ('gold'/'silver'/'bronze'/null). Optional: records saved
+   * before tiers existed won't have this — readers should treat a missing tiers object
+   * the same as all-null (tierEmoji already renders undefined as the blank marker). */
+  tiers?: { country: StarTier; capital: StarTier; flag: StarTier };
 }
 
 export interface StoredDailyRecord {

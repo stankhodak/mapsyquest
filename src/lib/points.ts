@@ -20,9 +20,37 @@ export function tryFraction(tryNumber: number): number {
 /**
  * Star-count multiplier applied to a round's total score: +30% per star, with the
  * 3-star case rounded up to a clean 2x ("a perfect round doubles your score").
+ * Tier-blind by design — any earned star counts the same toward this multiplier
+ * regardless of which medal (see StarTier below) it came in as.
  */
 const STAR_MULTIPLIERS = [1, 1.3, 1.6, 2] as const;
 
 export function starMultiplier(starCount: number): number {
   return STAR_MULTIPLIERS[starCount] ?? 1;
+}
+
+/**
+ * Which medal a category's star was earned as, based on the try it was correctly
+ * answered on: 1st try = gold, 2nd = silver, 3rd = bronze. `null` means no star was
+ * earned (wrong/skipped). A category with fewer than 3 max tries (capital: 2, flag: 1)
+ * simply never reaches the lower tiers.
+ */
+export type StarTier = 'gold' | 'silver' | 'bronze' | null;
+
+export function tierForTry(tryNumber: number): StarTier {
+  if (tryNumber === 1) return 'gold';
+  if (tryNumber === 2) return 'silver';
+  if (tryNumber === 3) return 'bronze';
+  return null;
+}
+
+const TIER_EMOJI: Record<Exclude<StarTier, null>, string> = {
+  gold: '🥇',
+  silver: '🥈',
+  bronze: '🥉',
+};
+
+/** Emoji for a tier, or a blank marker for "no star" — accepts undefined so old stored records without tier data degrade gracefully. */
+export function tierEmoji(tier: StarTier | undefined): string {
+  return tier ? TIER_EMOJI[tier] : '⬛';
 }
