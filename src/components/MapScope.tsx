@@ -55,8 +55,10 @@ const MAX_MAP_ZOOM = 16;
 const FLASH_DURATION_MS = 900;
 /** Camera travel time for both the flash-to-wrong-country hop and the ease back —
  * kept equal so neither direction feels like an abrupt pop next to the other. */
-const CAMERA_MOVE_DURATION_MS = 700;
-const INTRO_GLIDE_START_ZOOM = 1.5;
+const CAMERA_MOVE_DURATION_MS = 840;
+/** As wide as the map ever goes (matches MIN_MAP_ZOOM), so the country step's intro
+ * glide starts from as close to a full world view as the map allows. */
+const INTRO_GLIDE_START_ZOOM = MIN_MAP_ZOOM;
 const INTRO_GLIDE_DURATION_MS = 2000;
 const HINT_COLOR = '#f59e0b';
 const HINT_FILL_OPACITY = 0.25;
@@ -440,7 +442,7 @@ export function MapScope({
       >
         {cornerLabel && (
           <div
-            className="absolute left-2 top-2 z-10 max-w-[65%] text-lg font-bold leading-tight tracking-wide text-[#f59e0b] [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] sm:text-xl"
+            className="absolute left-2 top-2 z-10 max-w-[65%] text-base font-bold leading-tight tracking-wide text-[#f59e0b] [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] sm:text-lg"
             style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
             {cornerLabel}
