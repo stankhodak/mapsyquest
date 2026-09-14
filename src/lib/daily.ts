@@ -31,6 +31,12 @@ export function todayKey(date: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Milliseconds until local midnight — when the next day's challenge unlocks. */
+export function msUntilNextDay(now: Date = new Date()): number {
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return nextMidnight.getTime() - now.getTime();
+}
+
 /** Selects this day's 7 countries, deterministic per date key. */
 export function getDailyCountries(dateKey: string = todayKey()): Country[] {
   const rng = mulberry32(seedFromDateKey(dateKey));

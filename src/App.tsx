@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { RoundFlow, type RoundResult } from './components/RoundFlow';
+import { StartScreen } from './components/StartScreen';
 import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
 import {
@@ -18,6 +19,8 @@ interface SummaryRow {
   points: number;
 }
 
+// Spoiler-free by design: no country/capital names, just the per-round star blocks
+// and points (Wordle-style), so sharing doesn't give away any of the day's answers.
 function buildShareText(
   dateKey: string,
   totalStars: number,
@@ -30,7 +33,7 @@ function buildShareText(
     `MapsyQuest — ${dateKey}`,
     `⭐ ${totalStars}/${totalRounds * 3} · ${totalPoints} pts${streakDays > 0 ? ` · 🔥 ${streakDays}` : ''}`,
     '',
-    ...rows.map((r) => `${'⭐'.repeat(r.stars)}${'⬛'.repeat(3 - r.stars)} ${r.countryName}`),
+    ...rows.map((r) => `${'⭐'.repeat(r.stars)}${'⬛'.repeat(3 - r.stars)} ${r.points}pts`),
   ];
   return lines.join('\n');
 }
@@ -59,6 +62,10 @@ function App() {
   // Bumped on reset so RoundFlow remounts even when round 1's country id is unchanged.
   const [resetCount, setResetCount] = useState(0);
   const [showCopiedNotice, setShowCopiedNotice] = useState(false);
+  // Every visit lands on the start screen first — including a returning player who
+  // already finished today, who sees the locked/countdown state there rather than
+  // being dropped straight into their old results.
+  const [screen, setScreen] = useState<'start' | 'game'>('start');
 
   useEffect(() => {
     if (!showCopiedNotice) return;
@@ -147,7 +154,19 @@ function App() {
       </header>
 
       <main>
-        {!isGameOver && (
+        {screen === 'start' && (
+          <StartScreen
+            totalRounds={playOrder.length}
+            isLocked={isGameOver}
+            totalStars={totalStars}
+            totalPoints={totalPoints}
+            streak={streak}
+            onPlay={() => setScreen('game')}
+            onViewResults={() => setScreen('game')}
+          />
+        )}
+
+        {screen === 'game' && !isGameOver && (
           <RoundFlow
             key={`${resetCount}-${playOrder[roundIndex].id}`}
             country={playOrder[roundIndex]}
@@ -157,7 +176,7 @@ function App() {
           />
         )}
 
-        {isGameOver && (
+        {screen === 'game' && isGameOver && (
           <div className="mx-auto w-full max-w-md space-y-6 text-center">
             <h2 className="text-2xl font-semibold">Today's results</h2>
             {streak.currentStreak > 0 && (
@@ -199,6 +218,13 @@ function App() {
                 Results copied!
               </p>
             )}
+            <button
+              type="button"
+              onClick={() => setScreen('start')}
+              className="text-sm text-slate-400 underline hover:text-slate-200"
+            >
+              Return to main screen
+            </button>
           </div>
         )}
       </main>

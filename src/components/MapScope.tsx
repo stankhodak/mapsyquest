@@ -32,6 +32,10 @@ interface MapScopeProps {
   flashGuessId?: string | null;
   /** Bump to trigger the wrong-guess flash described above. */
   flashSignal?: number;
+  /** Show the center-pin marker. Defaults to true; the start screen's purely decorative map turns it off. */
+  showMarker?: boolean;
+  /** Show the zoom +/- and reset-view buttons. Defaults to true; off for the start screen's decorative map. */
+  showControls?: boolean;
 }
 
 // OpenFreeMap: free vector tiles, no API key, ODbL-licensed OpenStreetMap data.
@@ -177,6 +181,8 @@ export function MapScope({
   labelPosition,
   flashGuessId,
   flashSignal,
+  showMarker = true,
+  showControls = true,
 }: MapScopeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -217,7 +223,9 @@ export function MapScope({
       revealBordersPast(map, zoom);
     });
 
-    markerRef.current = new Marker({ color: '#f43f5e' }).setLngLat([center.lng, center.lat]).addTo(map);
+    if (showMarker) {
+      markerRef.current = new Marker({ color: '#f43f5e' }).setLngLat([center.lng, center.lat]).addTo(map);
+    }
     mapRef.current = map;
 
     if (revealName && labelPosition && countryName) {
@@ -362,32 +370,36 @@ export function MapScope({
         ref={containerRef}
         className="relative aspect-video w-full touch-none select-none overflow-hidden rounded-xl border border-slate-700 bg-sky-950"
       >
-        <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => mapRef.current?.zoomIn({ duration: 150 })}
-            className="flex h-7 w-7 items-center justify-center rounded bg-slate-800/80 text-slate-100 hover:bg-slate-700"
-            aria-label="Zoom in"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            onClick={() => mapRef.current?.zoomOut({ duration: 150 })}
-            className="flex h-7 w-7 items-center justify-center rounded bg-slate-800/80 text-slate-100 hover:bg-slate-700"
-            aria-label="Zoom out"
-          >
-            −
-          </button>
-        </div>
+        {showControls && (
+          <>
+            <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => mapRef.current?.zoomIn({ duration: 150 })}
+                className="flex h-7 w-7 items-center justify-center rounded bg-slate-800/80 text-slate-100 hover:bg-slate-700"
+                aria-label="Zoom in"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => mapRef.current?.zoomOut({ duration: 150 })}
+                className="flex h-7 w-7 items-center justify-center rounded bg-slate-800/80 text-slate-100 hover:bg-slate-700"
+                aria-label="Zoom out"
+              >
+                −
+              </button>
+            </div>
 
-        <button
-          type="button"
-          onClick={resetView}
-          className="absolute bottom-2 left-2 z-10 rounded bg-slate-800/80 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300 hover:bg-slate-700"
-        >
-          reset view
-        </button>
+            <button
+              type="button"
+              onClick={resetView}
+              className="absolute bottom-2 left-2 z-10 rounded bg-slate-800/80 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300 hover:bg-slate-700"
+            >
+              reset view
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
