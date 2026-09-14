@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tierForTry, tryFraction, type StarTier } from '../lib/points';
@@ -38,6 +38,17 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
   const [flashGuessId, setFlashGuessId] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Hard rule: never autofocus on mobile. Focusing an input there pops the keyboard
+  // and yanks the page into a scroll-jump the instant a new round/step opens, before
+  // the player has even seen the map — matches the app's own md: breakpoint for
+  // "desktop" elsewhere. Desktop keeps the convenience of landing ready to type.
+  useEffect(() => {
+    if (window.matchMedia('(min-width: 768px)').matches) {
+      inputRef.current?.focus();
+    }
+  }, []);
 
   const trimmed = query.trim();
   const matches =
@@ -125,7 +136,7 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
           </div>
         )}
         <input
-          autoFocus
+          ref={inputRef}
           value={query}
           disabled={locked}
           autoComplete="off"
