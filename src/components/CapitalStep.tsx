@@ -107,7 +107,6 @@ export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: Ca
         outlinePaddingFraction={OUTLINE_PADDING_FRACTION}
         revealName
         labelPosition={answer.center}
-        capitalName={answer.capital}
       />
       <div className="grid grid-cols-4 gap-1.5">
         {options.map((option) => {
