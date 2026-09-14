@@ -37,6 +37,8 @@ function buildShareText(
     `⭐ ${totalStars}/${totalRounds * 3} · ${totalPoints} pts${streakDays > 0 ? ` · 🔥 ${streakDays}` : ''}`,
     '',
     ...rows.map((r) => `${tierEmoji(r.tiers?.country)}${tierEmoji(r.tiers?.capital)}${tierEmoji(r.tiers?.flag)}`),
+    '',
+    'https://mapsyquest.vercel.app/',
   ];
   return lines.join('\n');
 }
