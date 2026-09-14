@@ -55,7 +55,11 @@ function App() {
   const [dateKey] = useState(() => todayKey());
   // The daily set is deterministic (same 7 countries for everyone, each date), but
   // the play ORDER reshuffles on Reset purely for replay/testing convenience.
-  const [playOrder, setPlayOrder] = useState<Country[]>(() => getDailyCountries(dateKey));
+  // Setter is `_`-prefixed (TS noUnusedLocals exempts underscore-prefixed names) since
+  // its only caller, handleReset, is commented out below. Restoring Reset needs BOTH:
+  // rename `_setPlayOrder` -> `setPlayOrder` here AND uncomment handleReset (which
+  // already calls it as `setPlayOrder`).
+  const [playOrder, _setPlayOrder] = useState<Country[]>(() => getDailyCountries(dateKey));
 
   const [storedRecord, setStoredRecord] = useState<StoredDailyRecord | null>(() =>
     loadDailyRecord(dateKey),
@@ -64,7 +68,9 @@ function App() {
   const [roundIndex, setRoundIndex] = useState(0);
   const [results, setResults] = useState<RoundResult[]>([]);
   // Bumped on reset so RoundFlow remounts even when round 1's country id is unchanged.
-  const [resetCount, setResetCount] = useState(0);
+  // Setter is `_`-prefixed for the same reason as _setPlayOrder above — restore both
+  // together (rename `_setResetCount` -> `setResetCount` here, uncomment handleReset).
+  const [resetCount, _setResetCount] = useState(0);
   const [showCopiedNotice, setShowCopiedNotice] = useState(false);
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
