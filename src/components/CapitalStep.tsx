@@ -81,12 +81,13 @@ export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: Ca
     setTryNumber((t) => t + 1);
   }
 
-  function skip() {
-    if (locked) return;
-    setLocked(true);
-    setResolved(true);
-    onComplete({ guess: '(skipped)', score: 0, isStar: false, tier: null });
-  }
+  // Skip removed for now — uncomment this function and the button below to restore it.
+  // function skip() {
+  //   if (locked) return;
+  //   setLocked(true);
+  //   setResolved(true);
+  //   onComplete({ guess: '(skipped)', score: 0, isStar: false, tier: null });
+  // }
 
   return (
     <div className="space-y-3">
@@ -135,6 +136,7 @@ export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: Ca
           );
         })}
       </div>
+      {/* Skip removed for now — uncomment to restore it.
       <button
         type="button"
         onClick={skip}
@@ -143,6 +145,7 @@ export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: Ca
       >
         Skip
       </button>
+      */}
     </div>
   );
 }

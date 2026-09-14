@@ -5,7 +5,7 @@ import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { tierEmoji } from './lib/points';
 import {
-  clearDailyRecord,
+  // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
   loadDailyRecord,
   loadStreak,
   saveDailyCompletion,
@@ -41,14 +41,15 @@ function buildShareText(
   return lines.join('\n');
 }
 
-function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
+// Only used by the disabled Reset button — restore alongside it.
+// function shuffle<T>(items: T[]): T[] {
+//   const copy = [...items];
+//   for (let i = copy.length - 1; i > 0; i--) {
+//     const j = Math.floor(Math.random() * (i + 1));
+//     [copy[i], copy[j]] = [copy[j], copy[i]];
+//   }
+//   return copy;
+// }
 
 function App() {
   const [dateKey] = useState(() => todayKey());
@@ -105,15 +106,16 @@ function App() {
     setRoundIndex((prev) => prev + 1);
   }
 
-  /** Restarts the game: clears today's progress and reshuffles the round order. */
-  function handleReset() {
-    clearDailyRecord(dateKey);
-    setStoredRecord(null);
-    setResults([]);
-    setRoundIndex(0);
-    setPlayOrder(shuffle(getDailyCountries(dateKey)));
-    setResetCount((n) => n + 1);
-  }
+  // Reset removed for now — uncomment this function and the button below to restore it.
+  // /** Restarts the game: clears today's progress and reshuffles the round order. */
+  // function handleReset() {
+  //   clearDailyRecord(dateKey);
+  //   setStoredRecord(null);
+  //   setResults([]);
+  //   setRoundIndex(0);
+  //   setPlayOrder(shuffle(getDailyCountries(dateKey)));
+  //   setResetCount((n) => n + 1);
+  // }
 
   async function handleShare() {
     const text = buildShareText(
@@ -219,6 +221,7 @@ function App() {
               >
                 Share results
               </button>
+              {/* Reset removed for now — uncomment to restore it.
               <button
                 type="button"
                 onClick={handleReset}
@@ -226,6 +229,7 @@ function App() {
               >
                 Reset
               </button>
+              */}
             </div>
             {showCopiedNotice && (
               <p role="status" className="text-sm text-emerald-400">
