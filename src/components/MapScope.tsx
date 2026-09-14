@@ -442,7 +442,7 @@ export function MapScope({
       >
         {cornerLabel && (
           <div
-            className="absolute left-2 top-2 z-10 max-w-[65%] text-base font-bold leading-tight tracking-wide text-[#f59e0b] [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] sm:text-lg"
+            className="absolute left-2 top-2 z-10 max-w-[65%] text-base font-bold leading-tight tracking-wide text-emerald-400 [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] sm:text-lg"
             style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
             {cornerLabel}
