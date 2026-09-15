@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
 import { StartScreen } from './components/StartScreen';
+import { getCountryById } from './data/countries';
 import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
-import { tierEmoji } from './lib/points';
+import { flagImageUrl } from './lib/flags';
+import { tierEmoji, tierIcon } from './lib/points';
 import {
   // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
   loadDailyRecord,
@@ -207,18 +209,33 @@ function App() {
             <p className="text-lg">
               {totalStars} / {playOrder.length * 3} stars &middot; {totalPoints} points
             </p>
-            <ul className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 text-left text-sm text-slate-300">
-              {summaryRows.map((r) => (
-                <li key={r.countryId} className="contents">
-                  <span className="truncate font-medium text-slate-100">{r.countryName}</span>
-                  <span className="text-right">
-                    {tierEmoji(r.tiers?.country)}
-                    {tierEmoji(r.tiers?.capital)}
-                    {tierEmoji(r.tiers?.flag)}
-                  </span>
-                  <span className="text-right">{r.points} pts</span>
-                </li>
-              ))}
+            <ul className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-1 text-left text-sm text-slate-300">
+              {summaryRows.map((r) => {
+                const country = getCountryById(r.countryId);
+                return (
+                  <li key={r.countryId} className="contents">
+                    <span className="pt-3 leading-snug font-medium text-slate-100">{r.countryName}</span>
+                    <span className="pt-3 text-right">{tierIcon(r.tiers?.country)}</span>
+                    <span className="pt-3 text-right">{r.points} pts</span>
+
+                    <span className="leading-snug text-slate-400">{country?.capital ?? '—'}</span>
+                    <span className="text-right">{tierIcon(r.tiers?.capital)}</span>
+                    <span />
+
+                    <span className="pb-3">
+                      {country && (
+                        <img
+                          src={flagImageUrl(country.id)}
+                          alt=""
+                          className="h-6 w-9 rounded-sm border border-slate-700 object-cover"
+                        />
+                      )}
+                    </span>
+                    <span className="pb-3 text-right">{tierIcon(r.tiers?.flag)}</span>
+                    <span className="pb-3" />
+                  </li>
+                );
+              })}
             </ul>
             <p className="text-xs text-slate-500">Come back tomorrow for a new set of countries.</p>
             <div className="flex items-center justify-center gap-3">

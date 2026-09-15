@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Country } from '../data/types';
-import { starMultiplier, tierEmoji, type StarTier } from '../lib/points';
+import { starMultiplier, tierIcon, type StarTier } from '../lib/points';
 import { RoundBadge } from './Badge';
 import { CapitalStep, type CapitalGuessResult } from './CapitalStep';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
@@ -104,17 +104,17 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
           </h2>
           <ul className="space-y-1 text-sm text-slate-300">
             <li>
-              Country: {tierEmoji(countryGuess.tier)}{' '}
+              Country: {tierIcon(countryGuess.tier)}{' '}
               {countryGuess.isCorrect
                 ? `correct (${countryGuess.score} pts)`
                 : `(you said "${countryGuess.guess}")`}
             </li>
             <li>
-              Capital: {tierEmoji(capitalGuess.tier)} {capitalGuess.score} pts (you said "{capitalGuess.guess}") —
+              Capital: {tierIcon(capitalGuess.tier)} {capitalGuess.score} pts (you said "{capitalGuess.guess}") —
               correct: {country.capital}
             </li>
             <li>
-              Flag: {tierEmoji(flagGuess.tier)} {flagGuess.isCorrect ? `correct (${flagGuess.score} pts)` : 'incorrect'}
+              Flag: {tierIcon(flagGuess.tier)} {flagGuess.isCorrect ? `correct (${flagGuess.score} pts)` : 'incorrect'}
             </li>
           </ul>
           <p className="text-base font-semibold text-slate-100">
