@@ -74,13 +74,10 @@ export function StartScreen({
         ))}
       </div>
 
-      <p className="text-sm font-semibold text-amber-300">⭐ Earn stars &middot; 🏆 Earn points</p>
-
-      {streak.currentStreak > 0 && (
-        <p className="text-sm text-amber-400">
-          🔥 {streak.currentStreak} day streak (best {streak.maxStreak})
-        </p>
-      )}
+      <p className="text-sm font-semibold text-amber-300">
+        ⭐ Earn stars &middot; 🏆 Earn points
+        {streak.currentStreak > 0 && <> &middot; 🔥 {streak.currentStreak} day streak</>}
+      </p>
 
       {isLocked ? (
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
