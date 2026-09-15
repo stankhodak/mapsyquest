@@ -50,12 +50,7 @@ const TIER_EMOJI: Record<Exclude<StarTier, null>, string> = {
   bronze: '🥉',
 };
 
-/** Emoji for a tier, or a blank marker for "no star" — accepts undefined so old stored records without tier data degrade gracefully. Used for the shareable Copy-results text, which must stay Wordle-style (⬛ for a miss). */
-export function tierEmoji(tier: StarTier | undefined): string {
-  return tier ? TIER_EMOJI[tier] : '⬛';
-}
-
-/** Same as tierEmoji but for on-screen display: a miss renders as a red X instead of a black box. */
+/** Emoji for a tier, or a red X for "no star" — accepts undefined so old stored records without tier data degrade gracefully. Used both on-screen and in the shareable Copy-results text. */
 export function tierIcon(tier: StarTier | undefined): string {
   return tier ? TIER_EMOJI[tier] : '❌';
 }

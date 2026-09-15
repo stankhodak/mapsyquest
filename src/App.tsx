@@ -5,7 +5,7 @@ import { getCountryById } from './data/countries';
 import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
-import { tierEmoji, tierIcon } from './lib/points';
+import { tierIcon } from './lib/points';
 import {
   // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
   loadDailyRecord,
@@ -38,7 +38,7 @@ function buildShareText(
     `MapsyQuest — ${dateKey}`,
     `⭐ ${totalStars}/${totalRounds * 3} · ${totalPoints} pts${streakDays > 0 ? ` · 🔥 ${streakDays}` : ''}`,
     '',
-    ...rows.map((r) => `${tierEmoji(r.tiers?.country)}${tierEmoji(r.tiers?.capital)}${tierEmoji(r.tiers?.flag)}`),
+    ...rows.map((r) => `${tierIcon(r.tiers?.country)}${tierIcon(r.tiers?.capital)}${tierIcon(r.tiers?.flag)}`),
     '',
     'https://mapsyquest.vercel.app/',
   ];
@@ -209,30 +209,35 @@ function App() {
             <p className="text-lg">
               {totalStars} / {playOrder.length * 3} stars &middot; {totalPoints} points
             </p>
-            <ul className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-1 text-left text-sm text-slate-300">
-              {summaryRows.map((r) => {
+            <ul className="grid grid-cols-[1.1rem_minmax(0,1fr)_minmax(0,1fr)_1.6rem_auto_auto] items-center gap-x-2 text-left text-xs text-slate-300">
+              {summaryRows.map((r, i) => {
                 const country = getCountryById(r.countryId);
                 return (
                   <li key={r.countryId} className="contents">
-                    <span className="pt-3 leading-snug font-medium text-slate-100">{r.countryName}</span>
-                    <span className="pt-3 text-right">{tierIcon(r.tiers?.country)}</span>
-                    <span className="pt-3 text-right">{r.points} pts</span>
-
-                    <span className="leading-snug text-slate-400">{country?.capital ?? '—'}</span>
-                    <span className="text-right">{tierIcon(r.tiers?.capital)}</span>
-                    <span />
-
-                    <span className="pb-3">
+                    <span className="border-b border-slate-800/70 py-1.5 text-slate-500">{i + 1}</span>
+                    <span className="truncate border-b border-slate-800/70 py-1.5 font-medium text-slate-100">
+                      {r.countryName}
+                    </span>
+                    <span className="truncate border-b border-slate-800/70 py-1.5 text-slate-400">
+                      {country?.capital ?? '—'}
+                    </span>
+                    <span className="border-b border-slate-800/70 py-1.5">
                       {country && (
                         <img
                           src={flagImageUrl(country.id)}
                           alt=""
-                          className="h-6 w-9 rounded-sm border border-slate-700 object-cover"
+                          className="h-4 w-6 rounded-sm border border-slate-700 object-cover"
                         />
                       )}
                     </span>
-                    <span className="pb-3 text-right">{tierIcon(r.tiers?.flag)}</span>
-                    <span className="pb-3" />
+                    <span className="whitespace-nowrap border-b border-slate-800/70 py-1.5 tracking-tight">
+                      {tierIcon(r.tiers?.country)}
+                      {tierIcon(r.tiers?.capital)}
+                      {tierIcon(r.tiers?.flag)}
+                    </span>
+                    <span className="whitespace-nowrap border-b border-slate-800/70 py-1.5 text-right text-slate-300">
+                      {r.points}
+                    </span>
                   </li>
                 );
               })}

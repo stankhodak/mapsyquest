@@ -16,7 +16,7 @@ export interface StoredRoundResult {
   points: number;
   /** Per-category medal tiers ('gold'/'silver'/'bronze'/null). Optional: records saved
    * before tiers existed won't have this — readers should treat a missing tiers object
-   * the same as all-null (tierEmoji already renders undefined as the blank marker). */
+   * the same as all-null (tierIcon already renders undefined as a miss). */
   tiers?: { country: StarTier; capital: StarTier; flag: StarTier };
 }
 
