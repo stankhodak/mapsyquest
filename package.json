@@ -11,9 +11,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:map": "node scripts/build-world-map.mjs",
-    "build:countries": "node scripts/build-countries.mjs"
+    "build:countries": "node scripts/build-countries.mjs",
+    "build:shapes": "node scripts/build-country-shapes.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "maplibre-gl": "^6.9.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
@@ -32,6 +35,7 @@
     "pbf": "^5.1.2",
     "tailwindcss": "^4.3.3",
     "topojson-client": "^3.1.0",
+    "topojson-simplify": "^3.0.3",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0",

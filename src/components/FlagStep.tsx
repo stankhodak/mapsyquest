@@ -2,20 +2,29 @@ import { useMemo, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
+import { MAX_SCORE, tierForTry, type StarTier } from '../lib/points';
+import { AttemptBadge, RoundBadge } from './Badge';
+import { MapScope } from './MapScope';
 
 export interface FlagGuessResult {
   guess: string;
   isCorrect: boolean;
-  elapsedMs: number;
+  score: number;
+  tier: StarTier;
 }
 
 interface FlagStepProps {
   answer: Country;
+  roundNumber: number;
+  totalRounds: number;
   onComplete: (result: FlagGuessResult) => void;
 }
 
 const OPTION_COUNT = 10;
-const REVEAL_DELAY_MS = 500;
+/** Only one attempt — a single wrong flag ends the step, unlike country/capital's 3 tries. */
+const REVEAL_DELAY_MS = 900;
+/** Matches the capital step's tighter hint margin, so the country fills most of the frame. */
+const OUTLINE_PADDING_FRACTION = 0.12;
 
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
@@ -26,8 +35,7 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-export function FlagStep({ answer, onComplete }: FlagStepProps) {
-  const [startTime] = useState(() => Date.now());
+export function FlagStep({ answer, roundNumber, totalRounds, onComplete }: FlagStepProps) {
   const [selected, setSelected] = useState<string | null>(null);
 
   // Distractors are plain random picks for now; the instructions doc flags
@@ -41,18 +49,38 @@ export function FlagStep({ answer, onComplete }: FlagStepProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answer.id]);
 
-  function submit(id: string) {
+  function pick(id: string) {
     if (selected) return;
     setSelected(id);
     const isCorrect = id === answer.id;
-    window.setTimeout(() => {
-      onComplete({ guess: id, isCorrect, elapsedMs: Date.now() - startTime });
-    }, REVEAL_DELAY_MS);
+    const score = isCorrect ? MAX_SCORE.flag : 0;
+    window.setTimeout(
+      () => onComplete({ guess: id, isCorrect, score, tier: isCorrect ? tierForTry(1) : null }),
+      REVEAL_DELAY_MS,
+    );
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-medium text-slate-100">Which flag belongs to {answer.name}?</h2>
+      <div className="flex items-center justify-between gap-2">
+        <RoundBadge>
+          Round {roundNumber} of {totalRounds}
+        </RoundBadge>
+        <AttemptBadge current={1} max={1} tone="red" label="Only One Attempt" />
+      </div>
+      <MapScope
+        center={answer.capitalCoords}
+        zoom={answer.mapZoom + 1}
+        countryId={answer.id}
+        countryName={answer.name}
+        revealOutline
+        fitToOutline
+        outlinePaddingFraction={OUTLINE_PADDING_FRACTION}
+        revealName
+        labelPosition={answer.center}
+        capitalName={answer.capital}
+        cornerLabel="Guess the flag"
+      />
       <div className="grid grid-cols-5 gap-2">
         {options.map((c) => {
           const isRevealed = selected !== null;
@@ -61,7 +89,7 @@ export function FlagStep({ answer, onComplete }: FlagStepProps) {
           const stateClasses = !isRevealed
             ? 'border-slate-600 bg-slate-800 hover:bg-slate-700'
             : isCorrectOption
-              ? 'border-emerald-500 bg-emerald-500/20'
+              ? 'border-4 border-emerald-400 bg-emerald-500/30'
               : isPicked
                 ? 'border-rose-500 bg-rose-500/20'
                 : 'border-slate-700 opacity-60';
@@ -71,7 +99,7 @@ export function FlagStep({ answer, onComplete }: FlagStepProps) {
               key={c.id}
               type="button"
               disabled={isRevealed}
-              onClick={() => submit(c.id)}
+              onClick={() => pick(c.id)}
               className={`flex h-16 items-center justify-center overflow-hidden rounded-lg border p-1 transition ${stateClasses}`}
               aria-label={isRevealed ? c.name : 'flag option'}
             >
