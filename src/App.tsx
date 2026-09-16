@@ -167,7 +167,7 @@ function App() {
     <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
       <header className="mx-auto mb-8 max-w-md text-center md:mb-3">
         <h1
-          className="bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 bg-clip-text text-4xl font-bold tracking-wide text-transparent [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] md:text-3xl"
+          className="bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 bg-clip-text text-4xl font-bold tracking-wide text-transparent md:text-3xl"
           style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
         >
           MapsyQuest
