@@ -1,4 +1,6 @@
+import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
+import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
 import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
@@ -16,6 +18,7 @@ import {
   type StoredDailyRecord,
   type StreakState,
 } from './lib/storage';
+import { supabase } from './lib/supabaseClient';
 
 interface SummaryRow {
   countryId: string;
@@ -77,13 +80,29 @@ function App() {
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
-  const [screen, setScreen] = useState<'start' | 'game' | 'privacy'>('start');
+  const [screen, setScreen] = useState<'start' | 'game' | 'privacy' | 'login'>('start');
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     if (!showCopiedNotice) return;
     const timer = setTimeout(() => setShowCopiedNotice(false), 1800);
     return () => clearTimeout(timer);
   }, [showCopiedNotice]);
+
+  // Picks up the session Supabase restores from storage on load, and the one it sets
+  // after a Google OAuth redirect back into the app (both go through this callback).
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => subscription.subscription.unsubscribe();
+  }, []);
+
+  function handleLogout() {
+    supabase?.auth.signOut();
+  }
 
   // Day-locked: today's game was already completed (possibly in an earlier
   // visit), so skip straight to the results already on record instead of
@@ -166,7 +185,12 @@ function App() {
           capped at max-w-2xl, translated back by half its width) so the Menu button's left edge lines
           up with the map's left border regardless of viewport size. */}
       <header className="relative left-1/2 z-20 mb-8 grid w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 grid-cols-[1fr_auto_1fr] items-start md:mb-3">
-        <MenuDropdown onPrivacyPolicy={() => setScreen('privacy')} />
+        <MenuDropdown
+          onPrivacyPolicy={() => setScreen('privacy')}
+          onLoginClick={() => setScreen('login')}
+          onLogout={handleLogout}
+          userEmail={session?.user.email ?? null}
+        />
         <div className="text-center">
           <h1
             className="text-4xl font-bold tracking-wide text-emerald-400 [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] md:text-3xl"
@@ -180,6 +204,8 @@ function App() {
 
       <main>
         {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
+
+        {screen === 'login' && <LoginScreen onBack={() => setScreen('start')} />}
 
         {screen === 'start' && (
           <StartScreen

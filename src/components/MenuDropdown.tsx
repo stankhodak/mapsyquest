@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 
 interface MenuDropdownProps {
   onPrivacyPolicy: () => void;
+  onLoginClick: () => void;
+  onLogout: () => void;
+  /** Signed-in user's email, or null when logged out. */
+  userEmail: string | null;
 }
 
 const DONATE_URL = 'https://ko-fi.com/gamesbonds';
 
-/** Bubble menu to the left of the title. Login is a placeholder for now — Donate and Privacy Policy are wired up. */
-export function MenuDropdown({ onPrivacyPolicy }: MenuDropdownProps) {
+/** Bubble menu to the left of the title. */
+export function MenuDropdown({ onPrivacyPolicy, onLoginClick, onLogout, userEmail }: MenuDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -42,12 +46,21 @@ export function MenuDropdown({ onPrivacyPolicy }: MenuDropdownProps) {
 
       {isOpen && (
         <div className="absolute left-0 top-full z-10 mt-2 w-48 overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-slate-800 to-slate-900 text-left shadow-xl shadow-emerald-500/10">
+          {userEmail && (
+            <p className="truncate px-4 pt-2.5 text-xs text-slate-500" title={userEmail}>
+              Signed in as {userEmail}
+            </p>
+          )}
           <button
             type="button"
-            disabled
-            className="flex w-full cursor-not-allowed items-center gap-2 px-4 py-2.5 text-sm text-slate-600"
+            onClick={() => {
+              setIsOpen(false);
+              if (userEmail) onLogout();
+              else onLoginClick();
+            }}
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
           >
-            <span>🔑</span> Login
+            <span>🔑</span> {userEmail ? 'Log out' : 'Login'}
           </button>
           <a
             href={DONATE_URL}
