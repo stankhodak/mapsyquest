@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Map as MapLibreMap, Marker, setWorkerUrl, type GeoJSONSource, type IControl } from 'maplibre-gl';
+import { LngLat, Map as MapLibreMap, Marker, setWorkerUrl, type GeoJSONSource, type IControl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Geometry } from 'geojson';
 import type { LatLng } from '../data/types';
@@ -30,10 +30,12 @@ interface MapScopeProps {
   labelPosition?: LatLng;
   /** Also show a smaller capital-name caption right at the pin (`center`). Optional even when revealName is set — the country step's final-try reveal doesn't use it. */
   capitalName?: string;
-  /** ISO alpha-2 id of the country the player actually guessed (wrong), if it matched a real country. Bump flashSignal to trigger a red flash of ITS outline; if this has no shape data, no flash occurs. */
+  /** ISO alpha-2 id of the country the player actually guessed (wrong), if it matched a real country. Bump flashSignal to add a red highlight of ITS outline, which then stays lit for the rest of the round (see flashSignal); if this has no shape data, no highlight occurs. */
   flashGuessId?: string | null;
-  /** Bump to trigger the wrong-guess flash described above. */
+  /** Bump to add flashGuessId's outline to the accumulated set of wrong-guess highlights (each stays red for the rest of the round, so the player can see every country already ruled out). The camera still hops to the new one and eases back afterwards. */
   flashSignal?: number;
+  /** Bump to flash the round's own answer (countryId) outline green — used the instant a correct guess is made, alongside the "Correct!" feedback badge. */
+  correctFlashSignal?: number;
   /** Show the center-pin marker. Defaults to true; the start screen's purely decorative map turns it off. */
   showMarker?: boolean;
   /** Show the zoom +/- and reset-view buttons. Defaults to true; off for the start screen's decorative map. */
@@ -64,15 +66,30 @@ const HINT_COLOR = '#f59e0b';
 const HINT_FILL_OPACITY = 0.25;
 const FLASH_COLOR = '#ef4444';
 const FLASH_FILL_OPACITY = 0.55;
+const CORRECT_COLOR = '#10b981';
+const CORRECT_FILL_OPACITY = 0.45;
 const DEFAULT_OUTLINE_PADDING_FRACTION = 0.15;
 /** The wrong-guess flash always uses this generous margin, regardless of outlinePaddingFraction. */
 const GUESS_FLASH_PADDING_FRACTION = 0.15;
 const HINT_SOURCE_ID = 'hint-country';
 const HINT_FILL_LAYER_ID = 'hint-country-fill';
 const HINT_LINE_LAYER_ID = 'hint-country-line';
+const CORRECT_FILL_LAYER_ID = 'correct-country-fill';
+const CORRECT_LINE_LAYER_ID = 'correct-country-line';
 const GUESS_SOURCE_ID = 'guess-country';
 const GUESS_FILL_LAYER_ID = 'guess-country-fill';
 const GUESS_LINE_LAYER_ID = 'guess-country-line';
+/** How far the outline-fit camera (revealOutline+fitToOutline) may zoom in beyond
+ * the round's own configured zoom. Kept small — a non-degenerate outline's natural
+ * fit is normally at or below the configured zoom already (see the mini-country map
+ * glitch report); this is mostly a safety net. */
+const OUTLINE_FIT_MAX_ZOOM_IN = 2;
+/** How far the outline-fit camera may zoom OUT below the round's configured zoom.
+ * Bounds how much a scattered outline (islands/territories far from the mainland —
+ * Kiribati, Russia's Far East, etc.) can force the camera to zoom out to fit
+ * everything; beyond this, fall back to a view centered on the round's own point
+ * instead of the outline's (possibly meaningless, mid-ocean) bounding-box center. */
+const OUTLINE_FIT_MAX_ZOOM_OUT = 3;
 
 type Shape = { bbox: [number, number, number, number]; geometry: { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown } };
 
@@ -120,6 +137,44 @@ function fitToBounds(map: MapLibreMap, bbox: [number, number, number, number], a
     ],
     { padding: 24, duration: animate ? CAMERA_MOVE_DURATION_MS : 0, maxZoom: MAX_MAP_ZOOM },
   );
+}
+
+/** Like fitToBounds, but for the outline hint/reveal specifically: clamps the
+ * resulting zoom to within OUTLINE_FIT_MAX_ZOOM_(IN|OUT) of the round's own
+ * configured zoom, so a degenerate-tiny or wildly scattered outline (see
+ * OUTLINE_FIT_MAX_ZOOM_OUT's doc comment) can't force an absurd zoom level. When
+ * the natural fit gets clamped, recenters on the round's own point (fallbackCenter)
+ * instead of the outline bbox's own center, which for a scattered outline can be a
+ * meaningless spot (e.g. mid-ocean between two of a nation's islands). */
+function fitToOutlineBounds(
+  map: MapLibreMap,
+  bbox: [number, number, number, number],
+  fallbackCenter: LatLng,
+  roundZoom: number,
+  animate: boolean,
+) {
+  const camera = map.cameraForBounds(
+    [
+      [bbox[0], bbox[1]],
+      [bbox[2], bbox[3]],
+    ],
+    { padding: 24, maxZoom: MAX_MAP_ZOOM },
+  );
+  if (!camera || camera.zoom == null) return;
+
+  const minZoom = roundZoom - OUTLINE_FIT_MAX_ZOOM_OUT;
+  const maxZoom = roundZoom + OUTLINE_FIT_MAX_ZOOM_IN;
+  const clampedZoom = Math.min(maxZoom, Math.max(minZoom, camera.zoom));
+  const wasClamped = clampedZoom !== camera.zoom;
+  const center: [number, number] =
+    wasClamped || !camera.center
+      ? [fallbackCenter.lng, fallbackCenter.lat]
+      : (() => {
+          const c = LngLat.convert(camera.center);
+          return [c.lng, c.lat];
+        })();
+
+  map.easeTo({ center, zoom: clampedZoom, duration: animate ? CAMERA_MOVE_DURATION_MS : 0 });
 }
 
 /** Compact attribution control that starts fully collapsed to just an "i" toggle. */
@@ -220,6 +275,7 @@ export function MapScope({
   capitalName,
   flashGuessId,
   flashSignal,
+  correctFlashSignal,
   showMarker = true,
   showControls = true,
   cornerLabel,
@@ -232,6 +288,9 @@ export function MapScope({
   const capitalLabelMarkerRef = useRef<Marker | null>(null);
   const shapesRecordRef = useRef<Record<string, Shape> | null>(null);
   const hintShapeRef = useRef<Shape | null>(null);
+  /** Every country id wrongly guessed so far this round — each stays highlighted red
+   * for the rest of the round once flashed (see the flashSignal effect). */
+  const wrongGuessIdsRef = useRef<Set<string>>(new Set());
   const layersReadyRef = useRef(false);
   const revealOutlineRef = useRef(revealOutline);
   // A plain re-render wouldn't re-run the revealOutline effect below, since its
@@ -324,12 +383,27 @@ export function MapScope({
           paint: { 'line-color': HINT_COLOR, 'line-width': 2, 'line-opacity': 0 },
         });
 
-        // Guess-flash layer starts on the same geometry as a harmless placeholder
-        // (hidden); its data is swapped to whichever country the player guessed
-        // wrong, at flash time.
+        // Correct-guess layer shares the hint source (same geometry: the round's own
+        // answer) — just a second, green-painted pair of layers toggled independently.
+        map.addLayer({
+          id: CORRECT_FILL_LAYER_ID,
+          type: 'fill',
+          source: HINT_SOURCE_ID,
+          paint: { 'fill-color': CORRECT_COLOR, 'fill-opacity': 0 },
+        });
+        map.addLayer({
+          id: CORRECT_LINE_LAYER_ID,
+          type: 'line',
+          source: HINT_SOURCE_ID,
+          paint: { 'line-color': CORRECT_COLOR, 'line-width': 2, 'line-opacity': 0 },
+        });
+
+        // Guess-highlight layer starts empty; each wrong guess adds its country's
+        // outline to this FeatureCollection (see the flashSignal effect below), and
+        // they all stay lit red for the rest of the round.
         map.addSource(GUESS_SOURCE_ID, {
           type: 'geojson',
-          data: { type: 'Feature', properties: {}, geometry: shape.geometry as Geometry },
+          data: { type: 'FeatureCollection', features: [] },
         });
         map.addLayer({
           id: GUESS_FILL_LAYER_ID,
@@ -390,7 +464,7 @@ export function MapScope({
       setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, HINT_FILL_OPACITY);
       revealBordersPast(map, zoom);
       if (fitToOutline && hintShapeRef.current) {
-        fitToBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), true);
+        fitToOutlineBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), center, zoom, true);
       }
     } else {
       setOutlineOpacity(map, HINT_FILL_LAYER_ID, HINT_LINE_LAYER_ID, 0);
@@ -401,10 +475,12 @@ export function MapScope({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealOutline, fitToOutline, outlinePaddingFraction, layersReadyTick]);
 
-  // On a wrong guess (flashSignal bump): flash the GUESSED country's outline in red,
-  // fit to its bounds, then either settle back into the hint state or return to the
-  // round's starting view. If the guess didn't match a real country (or we have no
-  // shape data for it), no map flash occurs at all.
+  // On a wrong guess (flashSignal bump): add the GUESSED country's outline to the
+  // accumulated set of wrong-guess highlights (staying red for the rest of the
+  // round — see wrongGuessIdsRef — so the player can find their way back to any
+  // country already ruled out), hop the camera to it, then ease back into the hint
+  // state or the round's starting view. If the guess didn't match a real country
+  // (or we have no shape data for it), nothing happens.
   useEffect(() => {
     if (!flashSignal) return;
     const map = mapRef.current;
@@ -413,15 +489,20 @@ export function MapScope({
     const guessShape = flashGuessId ? shapesRecordRef.current?.[flashGuessId] : null;
     if (!guessShape) return;
 
+    wrongGuessIdsRef.current.add(flashGuessId as string);
+    const features = [...wrongGuessIdsRef.current]
+      .map((id) => shapesRecordRef.current?.[id])
+      .filter((s): s is Shape => !!s)
+      .map((s) => ({ type: 'Feature' as const, properties: {}, geometry: s.geometry as Geometry }));
+
     const source = map.getSource(GUESS_SOURCE_ID) as GeoJSONSource | undefined;
-    source?.setData({ type: 'Feature', properties: {}, geometry: guessShape.geometry as Geometry });
+    source?.setData({ type: 'FeatureCollection', features });
     setOutlineOpacity(map, GUESS_FILL_LAYER_ID, GUESS_LINE_LAYER_ID, FLASH_FILL_OPACITY);
     fitToBounds(map, padBbox(guessShape.bbox, GUESS_FLASH_PADDING_FRACTION), true);
 
     const timeout = window.setTimeout(() => {
-      setOutlineOpacity(map, GUESS_FILL_LAYER_ID, GUESS_LINE_LAYER_ID, 0);
       if (revealOutlineRef.current && hintShapeRef.current) {
-        fitToBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), true);
+        fitToOutlineBounds(map, padBbox(hintShapeRef.current.bbox, outlinePaddingFraction), center, zoom, true);
       } else {
         map.easeTo({ center: [center.lng, center.lat], zoom, duration: CAMERA_MOVE_DURATION_MS });
       }
@@ -429,6 +510,17 @@ export function MapScope({
     return () => window.clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flashSignal]);
+
+  // On a correct guess (correctFlashSignal bump): light the round's own answer
+  // outline up green, in sync with the "Correct!" feedback badge. No camera move —
+  // the player is already looking at wherever they were when they guessed right.
+  useEffect(() => {
+    if (!correctFlashSignal) return;
+    const map = mapRef.current;
+    if (!map || !layersReadyRef.current) return;
+    setOutlineOpacity(map, CORRECT_FILL_LAYER_ID, CORRECT_LINE_LAYER_ID, CORRECT_FILL_OPACITY);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [correctFlashSignal]);
 
   function resetView() {
     mapRef.current?.jumpTo({ center: [center.lng, center.lat], zoom });

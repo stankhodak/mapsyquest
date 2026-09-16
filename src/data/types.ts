@@ -22,4 +22,8 @@ export interface Country {
    * geo-game-instructions.md. Not yet wired into the round flow.
    */
   settlementCount: 'many' | 'few';
+  /** True for island nations with no land borders (per world-countries' `borders` list). Used by the daily-quest generator to avoid overloading a day with hard-to-place islands. */
+  isIsland: boolean;
+  /** Island nations under ~2000 km² (Nauru, Tuvalu, Maldives, etc.) — a stricter sub-cap of isIsland in the daily-quest generator. */
+  isVerySmallIsland: boolean;
 }

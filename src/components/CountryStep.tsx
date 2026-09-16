@@ -36,6 +36,7 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
   const [tryNumber, setTryNumber] = useState(1);
   const [flashSignal, setFlashSignal] = useState(0);
   const [flashGuessId, setFlashGuessId] = useState<string | null>(null);
+  const [correctFlashSignal, setCorrectFlashSignal] = useState(0);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,6 +67,7 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
     if (isCorrect) {
       const score = Math.round(MAX_SCORE.country * tryFraction(tryNumber));
       setFeedback({ tone: 'correct', label: 'Correct!' });
+      setCorrectFlashSignal((s) => s + 1);
       window.setTimeout(
         () => onComplete({ guess: name, isCorrect: true, score, tier: tierForTry(tryNumber) }),
         FEEDBACK_DELAY_MS,
@@ -118,6 +120,7 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
         fitToOutline={onFinalTry}
         flashGuessId={flashGuessId}
         flashSignal={flashSignal}
+        correctFlashSignal={correctFlashSignal}
         cornerLabel="Guess the country"
         introGlide
       />

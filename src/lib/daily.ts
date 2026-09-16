@@ -2,6 +2,11 @@ import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 
 const ROUNDS_PER_DAY = 7;
+/** Islands (no land borders — see build-countries.mjs) are harder to place without
+ * neighbouring-country landmarks, so a single day caps how many can appear. */
+const MAX_ISLANDS_PER_DAY = 2;
+/** Stricter sub-cap within MAX_ISLANDS_PER_DAY for very small islands (Nauru, Tuvalu, etc.). */
+const MAX_VERY_SMALL_ISLANDS_PER_DAY = 1;
 
 /** Deterministic PRNG seeded from a number, so the same date always yields the same round order. */
 function mulberry32(seed: number): () => number {
@@ -48,5 +53,20 @@ export function getDailyCountries(dateKey: string = todayKey()): Country[] {
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
 
-  return pool.slice(0, ROUNDS_PER_DAY);
+  // Walk the shuffled pool, skipping countries that would push either island cap
+  // over its limit — keeps the selection deterministic while keeping a single day
+  // from stacking up on hard-to-place islands.
+  const selected: Country[] = [];
+  let islandCount = 0;
+  let verySmallIslandCount = 0;
+  for (const country of pool) {
+    if (selected.length >= ROUNDS_PER_DAY) break;
+    if (country.isVerySmallIsland && verySmallIslandCount >= MAX_VERY_SMALL_ISLANDS_PER_DAY) continue;
+    if (country.isIsland && islandCount >= MAX_ISLANDS_PER_DAY) continue;
+    selected.push(country);
+    if (country.isIsland) islandCount++;
+    if (country.isVerySmallIsland) verySmallIslandCount++;
+  }
+
+  return selected;
 }
