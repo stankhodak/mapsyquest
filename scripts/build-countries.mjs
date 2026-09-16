@@ -79,17 +79,6 @@ function wrapLng(lng) {
   return ((((lng + 180) % 360) + 360) % 360) - 180;
 }
 
-/** Shoelace-formula signed area of a ring (positive = counter-clockwise winding). */
-function ringSignedArea(ring) {
-  let area = 0;
-  for (let i = 0; i < ring.length; i++) {
-    const [x1, y1] = ring[i];
-    const [x2, y2] = ring[(i + 1) % ring.length];
-    area += x1 * y2 - x2 * y1;
-  }
-  return area / 2;
-}
-
 /** Area-weighted polygon centroid (the "center of mass" of the ring's interior). */
 function ringCentroid(ring) {
   let cx = 0;
@@ -124,16 +113,33 @@ function pointInRing([px, py], ring) {
   return inside;
 }
 
-/** The (antimeridian-unwrapped) outer ring of whichever polygon part has the largest area. */
-function largestOuterRing(geometry) {
+/** Smallest angular distance between two longitudes, wrapping around the antimeridian
+ * (e.g. 179 and -179 are 2° apart, not 358°). */
+function lngDistance(a, b) {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+/**
+ * The (antimeridian-unwrapped) outer ring of whichever polygon part sits closest to
+ * the capital — NOT necessarily the largest landmass. For split-territory countries
+ * (Equatorial Guinea's Bioko vs. mainland Río Muni; Kiribati's Gilbert vs. Line
+ * Islands, thousands of km apart) the capital's own island is what the capital/flag
+ * steps actually frame, so the country name label needs to land there too — picking
+ * the largest piece instead could put the label (and, previously, the country-step
+ * pin) on a totally different, far-off island. See the "country name off screen"
+ * report for Kiribati's capital step.
+ */
+function nearestOuterRingToCapital(geometry, capital) {
   const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
   let best = null;
-  let bestArea = -Infinity;
+  let bestDist = Infinity;
   for (const polygonCoords of polygons) {
     const ring = unwrapRingLongitudes(polygonCoords[0]);
-    const area = Math.abs(ringSignedArea(ring));
-    if (area > bestArea) {
-      bestArea = area;
+    const [cx, cy] = ringCentroid(ring);
+    const dist = Math.hypot(lngDistance(wrapLng(cx), capital.lng), cy - capital.lat);
+    if (dist < bestDist) {
+      bestDist = dist;
       best = ring;
     }
   }
@@ -141,12 +147,13 @@ function largestOuterRing(geometry) {
 }
 
 /**
- * A point guaranteed to sit on the country's largest landmass: the area centroid
- * of its outer ring, falling back to the vertex average, then a boundary vertex,
- * for the rare concave shape where the centroid itself lands outside the ring.
+ * A point guaranteed to sit on the country's landmass closest to its capital: the
+ * area centroid of that landmass's outer ring, falling back to the vertex average,
+ * then a boundary vertex, for the rare concave shape where the centroid itself
+ * lands outside the ring.
  */
-function computeLandCenter(geometry) {
-  const outerRing = largestOuterRing(geometry);
+function computeLandCenter(geometry, capital) {
+  const outerRing = nearestOuterRingToCapital(geometry, capital);
   const centroid = ringCentroid(outerRing);
   let point = centroid;
 
@@ -161,12 +168,12 @@ function computeLandCenter(geometry) {
 }
 
 const countryGeometries = countriesTopology.objects.countries.geometries;
-function landCenterFor(ccn3) {
+function landCenterFor(ccn3, capital) {
   const geom = countryGeometries.find((g) => g.id === ccn3);
   if (!geom) return null;
   const feature = topojson.feature(countriesTopology, { type: 'GeometryCollection', geometries: [geom] });
   const geometry = feature.features ? feature.features[0].geometry : feature.geometry;
-  const { lat, lng } = computeLandCenter(geometry);
+  const { lat, lng } = computeLandCenter(geometry, capital);
   return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
 }
 
@@ -188,7 +195,7 @@ function toCountryRecord(source) {
     name: source.name.common,
     capital: source.capital[0],
     region: source.region,
-    center: landCenterFor(source.ccn3) ?? { lat: source.latlng[0], lng: source.latlng[1] },
+    center: landCenterFor(source.ccn3, capitalCoords) ?? { lat: source.latlng[0], lng: source.latlng[1] },
     capitalCoords,
     mapZoom: estimateMapZoom(source.area),
     settlementCount: FEW_SETTLEMENTS.has(id) ? 'few' : 'many',
