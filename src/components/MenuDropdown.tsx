@@ -33,26 +33,26 @@ export function MenuDropdown({ onPrivacyPolicy }: MenuDropdownProps) {
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
-        className="rounded-full border border-slate-700 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+        className="rounded-xl bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-5 py-2.5 text-base font-bold text-slate-950 shadow-lg transition hover:scale-[1.02] hover:shadow-emerald-500/20 active:scale-[0.98]"
       >
         Menu
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-10 mt-2 w-44 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 text-left shadow-lg">
+        <div className="absolute left-0 top-full z-10 mt-2 w-48 overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-slate-800 to-slate-900 text-left shadow-xl shadow-emerald-500/10">
           <button
             type="button"
             disabled
-            className="block w-full cursor-not-allowed px-4 py-2 text-sm text-slate-600"
+            className="flex w-full cursor-not-allowed items-center gap-2 px-4 py-2.5 text-sm text-slate-600"
           >
-            Login
+            <span>🔑</span> Login
           </button>
           <button
             type="button"
             disabled
-            className="block w-full cursor-not-allowed px-4 py-2 text-sm text-slate-600"
+            className="flex w-full cursor-not-allowed items-center gap-2 px-4 py-2.5 text-sm text-slate-600"
           >
-            Donate
+            <span>💖</span> Donate
           </button>
           <button
             type="button"
@@ -60,9 +60,9 @@ export function MenuDropdown({ onPrivacyPolicy }: MenuDropdownProps) {
               setIsOpen(false);
               onPrivacyPolicy();
             }}
-            className="block w-full px-4 py-2 text-sm text-slate-200 hover:bg-slate-800"
+            className="flex w-full items-center gap-2 border-t border-slate-700/60 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
           >
-            Privacy Policy
+            <span>📄</span> Privacy Policy
           </button>
         </div>
       )}

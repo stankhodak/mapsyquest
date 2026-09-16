@@ -162,7 +162,10 @@ function App() {
 
   return (
     <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
-      <header className="mx-auto mb-8 grid max-w-md grid-cols-[1fr_auto_1fr] items-start md:mb-3">
+      {/* Same width/centering trick as MapScope's own wrapper (relative left-1/2 + w-[calc(100vw-2rem)]
+          capped at max-w-2xl, translated back by half its width) so the Menu button's left edge lines
+          up with the map's left border regardless of viewport size. */}
+      <header className="relative left-1/2 z-20 mb-8 grid w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 grid-cols-[1fr_auto_1fr] items-start md:mb-3">
         <MenuDropdown onPrivacyPolicy={() => setScreen('privacy')} />
         <div className="text-center">
           <h1
