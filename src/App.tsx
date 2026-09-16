@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { MenuDropdown } from './components/MenuDropdown';
+import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
 import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
 import { StartScreen } from './components/StartScreen';
 import { getCountryById } from './data/countries';
@@ -7,7 +9,7 @@ import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
 import { tierIcon } from './lib/points';
 import {
-  // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
+  clearDailyRecord,
   loadDailyRecord,
   loadStreak,
   saveDailyCompletion,
@@ -45,25 +47,23 @@ function buildShareText(
   return lines.join('\n');
 }
 
-// Only used by the disabled Reset button — restore alongside it.
-// function shuffle<T>(items: T[]): T[] {
-//   const copy = [...items];
-//   for (let i = copy.length - 1; i > 0; i--) {
-//     const j = Math.floor(Math.random() * (i + 1));
-//     [copy[i], copy[j]] = [copy[j], copy[i]];
-//   }
-//   return copy;
-// }
+// DEV-ONLY, used by the Reset button below. To remove: delete this function, the
+// handleReset function, the Reset button JSX, and switch playOrder/resetCount back
+// to their plain useState (no setters) form.
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
 function App() {
   const [dateKey] = useState(() => todayKey());
   // The daily set is deterministic (same 7 countries for everyone, each date), but
   // the play ORDER reshuffles on Reset purely for replay/testing convenience.
-  // Setter is `_`-prefixed (TS noUnusedLocals exempts underscore-prefixed names) since
-  // its only caller, handleReset, is commented out below. Restoring Reset needs BOTH:
-  // rename `_setPlayOrder` -> `setPlayOrder` here AND uncomment handleReset (which
-  // already calls it as `setPlayOrder`).
-  const [playOrder, _setPlayOrder] = useState<Country[]>(() => getDailyCountries(dateKey));
+  const [playOrder, setPlayOrder] = useState<Country[]>(() => getDailyCountries(dateKey));
 
   const [storedRecord, setStoredRecord] = useState<StoredDailyRecord | null>(() =>
     loadDailyRecord(dateKey),
@@ -72,14 +72,12 @@ function App() {
   const [roundIndex, setRoundIndex] = useState(0);
   const [results, setResults] = useState<RoundResult[]>([]);
   // Bumped on reset so RoundFlow remounts even when round 1's country id is unchanged.
-  // Setter is `_`-prefixed for the same reason as _setPlayOrder above — restore both
-  // together (rename `_setResetCount` -> `setResetCount` here, uncomment handleReset).
-  const [resetCount, _setResetCount] = useState(0);
+  const [resetCount, setResetCount] = useState(0);
   const [showCopiedNotice, setShowCopiedNotice] = useState(false);
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
-  const [screen, setScreen] = useState<'start' | 'game'>('start');
+  const [screen, setScreen] = useState<'start' | 'game' | 'privacy'>('start');
 
   useEffect(() => {
     if (!showCopiedNotice) return;
@@ -116,16 +114,15 @@ function App() {
     setRoundIndex((prev) => prev + 1);
   }
 
-  // Reset removed for now — uncomment this function and the button below to restore it.
-  // /** Restarts the game: clears today's progress and reshuffles the round order. */
-  // function handleReset() {
-  //   clearDailyRecord(dateKey);
-  //   setStoredRecord(null);
-  //   setResults([]);
-  //   setRoundIndex(0);
-  //   setPlayOrder(shuffle(getDailyCountries(dateKey)));
-  //   setResetCount((n) => n + 1);
-  // }
+  /** DEV-ONLY: restarts the game, clearing today's progress and reshuffling the round order. */
+  function handleReset() {
+    clearDailyRecord(dateKey);
+    setStoredRecord(null);
+    setResults([]);
+    setRoundIndex(0);
+    setPlayOrder(shuffle(getDailyCountries(dateKey)));
+    setResetCount((n) => n + 1);
+  }
 
   async function handleShare() {
     const text = buildShareText(
@@ -165,17 +162,22 @@ function App() {
 
   return (
     <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
-      <header className="mx-auto mb-8 max-w-md text-center md:mb-3">
-        <h1
-          className="text-4xl font-bold tracking-wide text-emerald-400 [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] md:text-3xl"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-        >
-          MapsyQuest
-        </h1>
-        <p className="text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
+      <header className="mx-auto mb-8 grid max-w-md grid-cols-[1fr_auto_1fr] items-start md:mb-3">
+        <MenuDropdown onPrivacyPolicy={() => setScreen('privacy')} />
+        <div className="text-center">
+          <h1
+            className="text-4xl font-bold tracking-wide text-emerald-400 [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] md:text-3xl"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
+            MapsyQuest
+          </h1>
+          <p className="text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
+        </div>
       </header>
 
       <main>
+        {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
+
         {screen === 'start' && (
           <StartScreen
             totalRounds={playOrder.length}
@@ -251,7 +253,7 @@ function App() {
               >
                 Share results
               </button>
-              {/* Reset removed for now — uncomment to restore it.
+              {/* DEV-ONLY: remove this button (and handleReset/shuffle above) to ship without a reset option. */}
               <button
                 type="button"
                 onClick={handleReset}
@@ -259,7 +261,6 @@ function App() {
               >
                 Reset
               </button>
-              */}
             </div>
             {showCopiedNotice && (
               <p role="status" className="text-sm text-emerald-400">
