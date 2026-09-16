@@ -4,7 +4,9 @@ interface MenuDropdownProps {
   onPrivacyPolicy: () => void;
 }
 
-/** Bubble menu to the left of the title. Login/Donate are placeholders for now — only Privacy Policy is wired up. */
+const DONATE_URL = 'https://ko-fi.com/gamesbonds';
+
+/** Bubble menu to the left of the title. Login is a placeholder for now — Donate and Privacy Policy are wired up. */
 export function MenuDropdown({ onPrivacyPolicy }: MenuDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,13 +49,15 @@ export function MenuDropdown({ onPrivacyPolicy }: MenuDropdownProps) {
           >
             <span>🔑</span> Login
           </button>
-          <button
-            type="button"
-            disabled
-            className="flex w-full cursor-not-allowed items-center gap-2 px-4 py-2.5 text-sm text-slate-600"
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsOpen(false)}
+            className="flex w-full items-center gap-2 border-t border-slate-700/60 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
           >
             <span>💖</span> Donate
-          </button>
+          </a>
           <button
             type="button"
             onClick={() => {
