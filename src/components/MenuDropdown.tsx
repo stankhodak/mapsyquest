@@ -39,7 +39,7 @@ export function MenuDropdown({ onPrivacyPolicy, onLoginClick, onLogout, userEmai
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
-        className="rounded-xl bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-5 py-2.5 text-base font-bold text-slate-950 shadow-lg transition hover:scale-[1.02] hover:shadow-emerald-500/20 active:scale-[0.98]"
+        className="rounded-xl bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-3 py-2 text-sm font-bold text-slate-950 shadow-lg transition hover:scale-[1.02] hover:shadow-emerald-500/20 active:scale-[0.98] sm:px-5 sm:py-2.5 sm:text-base"
       >
         Menu
       </button>

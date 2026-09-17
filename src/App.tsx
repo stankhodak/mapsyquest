@@ -179,27 +179,46 @@ function App() {
   const totalStars = storedRecord?.totalStars ?? results.reduce((sum, r) => sum + r.stars, 0);
   const totalPoints = storedRecord?.totalPoints ?? results.reduce((sum, r) => sum + r.points, 0);
 
+  // The nickname set at sign-up (see LoginScreen), falling back to whatever name Google
+  // shared, then finally the email itself — so there's always something to show once
+  // logged in, even for accounts created before nicknames existed.
+  const displayName = session
+    ? (session.user.user_metadata?.nickname as string | undefined) ||
+      (session.user.user_metadata?.full_name as string | undefined) ||
+      (session.user.user_metadata?.name as string | undefined) ||
+      session.user.email ||
+      'Account'
+    : null;
+
   return (
     <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
       {/* Same width/centering trick as MapScope's own wrapper (relative left-1/2 + w-[calc(100vw-2rem)]
           capped at max-w-2xl, translated back by half its width) so the Menu button's left edge lines
           up with the map's left border regardless of viewport size. */}
-      <header className="relative left-1/2 z-20 mb-8 grid w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 grid-cols-[1fr_auto_1fr] items-start md:mb-3">
+      <header className="relative left-1/2 z-20 mb-8 grid w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-start md:mb-3">
         <MenuDropdown
           onPrivacyPolicy={() => setScreen('privacy')}
           onLoginClick={() => setScreen('login')}
           onLogout={handleLogout}
           userEmail={session?.user.email ?? null}
         />
-        <div className="text-center">
+        <div className="min-w-0 text-center">
           <h1
-            className="text-4xl font-bold tracking-wide text-emerald-400 [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] md:text-3xl"
+            className="truncate text-lg font-bold tracking-wide text-emerald-400 [text-shadow:0_0_6px_rgba(15,23,42,0.9),0_0_10px_rgba(15,23,42,0.85),0_1px_2px_rgba(15,23,42,1)] sm:text-3xl md:text-3xl"
             style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
             MapsyQuest
           </h1>
-          <p className="text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
+          <p className="truncate text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
         </div>
+        {displayName && (
+          <div
+            title={displayName}
+            className="min-w-0 max-w-full justify-self-end truncate rounded-xl bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-3 py-2 text-sm font-bold text-slate-950 shadow-lg sm:px-5 sm:py-2.5 sm:text-base"
+          >
+            {displayName}
+          </div>
+        )}
       </header>
 
       <main>

@@ -7,10 +7,18 @@ interface LoginScreenProps {
 
 type Mode = 'sign-in' | 'sign-up';
 
+const PASSWORD_HINT = 'At least 8 characters, with an uppercase letter, a lowercase letter, and a number.';
+// No special-character requirement by design — see PASSWORD_HINT above.
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
 export function LoginScreen({ onBack }: LoginScreenProps) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
+  const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,11 +48,29 @@ export function LoginScreen({ onBack }: LoginScreenProps) {
     event.preventDefault();
     setError(null);
     setInfo(null);
+
+    if (mode === 'sign-up') {
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
+      if (!PASSWORD_PATTERN.test(password)) {
+        setError(`Password must be: ${PASSWORD_HINT}`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     const { error } =
       mode === 'sign-in'
         ? await supabase!.auth.signInWithPassword({ email, password })
-        : await supabase!.auth.signUp({ email, password });
+        : await supabase!.auth.signUp({
+            email,
+            password,
+            // Falls back to the email as the display name when left blank — see the
+            // account-badge logic in App.tsx that reads this same nickname field.
+            options: { data: { nickname: nickname.trim() || undefined } },
+          });
     setIsSubmitting(false);
     if (error) {
       setError(error.message);
@@ -76,6 +102,16 @@ export function LoginScreen({ onBack }: LoginScreenProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
+        {mode === 'sign-up' && (
+          <input
+            type="text"
+            maxLength={30}
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            placeholder="Nickname (optional)"
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+          />
+        )}
         <input
           type="email"
           required
@@ -85,16 +121,52 @@ export function LoginScreen({ onBack }: LoginScreenProps) {
           placeholder="Email"
           className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
         />
-        <input
-          type="password"
-          required
-          minLength={6}
-          autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            required
+            minLength={mode === 'sign-up' ? 8 : 6}
+            autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 pr-10 text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-emerald-300"
+          >
+            👁
+          </button>
+        </div>
+
+        {mode === 'sign-up' && (
+          <>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat password"
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 pr-10 text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-emerald-300"
+              >
+                👁
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">{PASSWORD_HINT}</p>
+          </>
+        )}
 
         {error && (
           <p role="alert" className="text-sm text-rose-400">
@@ -120,6 +192,8 @@ export function LoginScreen({ onBack }: LoginScreenProps) {
         type="button"
         onClick={() => {
           setMode((prev) => (prev === 'sign-in' ? 'sign-up' : 'sign-in'));
+          setConfirmPassword('');
+          setNickname('');
           setError(null);
           setInfo(null);
         }}
