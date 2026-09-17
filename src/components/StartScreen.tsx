@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { track } from '@vercel/analytics/react';
 import { msUntilNextDay } from '../lib/daily';
 import type { StreakState } from '../lib/storage';
 import { MapScope } from './MapScope';
@@ -59,7 +58,7 @@ export function StartScreen({
       <div className="space-y-1">
         <h2 className="text-xl font-bold text-slate-100">The Daily Geography Challenge</h2>
         <p className="text-sm text-slate-400">
-          {totalRounds} countries a day — nail the country, capital, and flag for each.
+          Guess {totalRounds} countries, their capitals and flags.
         </p>
       </div>
 
@@ -97,13 +96,7 @@ export function StartScreen({
       ) : (
         <button
           type="button"
-          onClick={() => {
-            // Fired once per browser per day (the day-lock prevents replay), so this
-            // event's daily count in the Vercel Analytics dashboard is a reasonable
-            // stand-in for "unique players per day" — dev-only, nothing shown in-app.
-            track('play_started');
-            onPlay();
-          }}
+          onClick={onPlay}
           className="w-full rounded-xl bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-6 py-3 text-lg font-bold text-slate-950 shadow-lg transition hover:scale-[1.02] hover:shadow-emerald-500/20 active:scale-[0.98]"
         >
           Play today's challenge

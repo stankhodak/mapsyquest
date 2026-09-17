@@ -1,10 +1,25 @@
+import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
+import {
+  trackGameAbandoned,
+  trackGameCompleted,
+  trackGameDuration,
+  trackGameStarted,
+  trackRoundCompleted,
+} from './lib/analytics';
+import { AccountBadge } from './components/AccountBadge';
+import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
+import { FeedbackScreen } from './components/FeedbackScreen';
+import { LoginScreen } from './components/LoginScreen';
+import { MenuDropdown } from './components/MenuDropdown';
+import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
 import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
 import { StartScreen } from './components/StartScreen';
 import { getCountryById } from './data/countries';
 import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
+import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
 import {
   // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
@@ -14,6 +29,7 @@ import {
   type StoredDailyRecord,
   type StreakState,
 } from './lib/storage';
+import { supabase } from './lib/supabaseClient';
 
 interface SummaryRow {
   countryId: string;
@@ -46,7 +62,7 @@ function buildShareText(
   return lines.join('\n');
 }
 
-// Only used by the disabled Reset button — restore alongside it.
+// Reset hidden for now — uncomment this function and the button below to restore it.
 // function shuffle<T>(items: T[]): T[] {
 //   const copy = [...items];
 //   for (let i = copy.length - 1; i > 0; i--) {
@@ -80,7 +96,14 @@ function App() {
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
-  const [screen, setScreen] = useState<'start' | 'game'>('start');
+  const [screen, setScreen] = useState<
+    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback'
+  >('start');
+  const [session, setSession] = useState<Session | null>(null);
+  // Set when the player presses Play (or dev-Resets); null once the round data itself
+  // (results/roundIndex) has been cleared without a fresh play, so the game_abandoned
+  // check below can tell "actively mid-game" apart from "sitting on the start screen".
+  const [gameStartedAt, setGameStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (!showCopiedNotice) return;
@@ -88,36 +111,97 @@ function App() {
     return () => clearTimeout(timer);
   }, [showCopiedNotice]);
 
+  // Reports a game_abandoned event if the tab closes/navigates away while a round is
+  // in progress. pagehide (not beforeunload) so it still fires on mobile Safari and
+  // doesn't block the page from entering the back/forward cache.
+  useEffect(() => {
+    function handlePageHide() {
+      if (gameStartedAt !== null && roundIndex < playOrder.length) {
+        trackGameAbandoned(roundIndex + 1);
+      }
+    }
+    window.addEventListener('pagehide', handlePageHide);
+    return () => window.removeEventListener('pagehide', handlePageHide);
+  }, [gameStartedAt, roundIndex, playOrder.length]);
+
+  // Google sign-in never goes through LoginScreen's own nickname field (it redirects
+  // straight to Google), so this is how those players get offered one — once, the
+  // first time, tracked via user_metadata.nicknamePrompted rather than re-asking on
+  // every login.
+  function maybePromptNickname(newSession: Session | null) {
+    const metadata = newSession?.user.user_metadata;
+    const isGoogleAccount = newSession?.user.app_metadata.provider === 'google';
+    if (isGoogleAccount && !metadata?.nickname && !metadata?.nicknamePrompted) {
+      setScreen('choose-nickname');
+    }
+  }
+
+  // Picks up the session Supabase restores from storage on load, and the one it sets
+  // after a Google OAuth redirect back into the app (both go through this callback).
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      maybePromptNickname(data.session);
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      maybePromptNickname(newSession);
+    });
+    return () => subscription.subscription.unsubscribe();
+  }, []);
+
+  function handleLogout() {
+    supabase?.auth.signOut();
+  }
+
   // Day-locked: today's game was already completed (possibly in an earlier
   // visit), so skip straight to the results already on record instead of
   // letting the player replay.
   const isGameOver = storedRecord !== null || roundIndex >= playOrder.length;
 
+  function handlePlay() {
+    trackGameStarted();
+    setGameStartedAt(Date.now());
+    setScreen('game');
+  }
+
   function handleRoundComplete(result: RoundResult) {
-    setResults((prev) => {
-      const next = [...prev, result];
-      if (next.length === playOrder.length) {
-        const record: StoredDailyRecord = {
-          date: dateKey,
-          results: next.map((r) => ({
-            countryId: r.country.id,
-            countryName: r.country.name,
-            stars: r.stars,
-            points: r.points,
-            tiers: r.tiers,
-          })),
-          totalStars: next.reduce((sum, r) => sum + r.stars, 0),
-          totalPoints: next.reduce((sum, r) => sum + r.points, 0),
-        };
-        setStreak(saveDailyCompletion(record));
-        setStoredRecord(record);
+    trackRoundCompleted(roundIndex + 1, result.stars, result.points);
+    // Built from `results` directly (not a setResults functional updater) specifically
+    // so the trackGameCompleted/trackGameDuration calls below run exactly once — a side
+    // effect inside a state updater gets double-invoked by StrictMode in dev (and isn't
+    // guaranteed once in general), which was firing these analytics events twice.
+    const next = [...results, result];
+    if (next.length === playOrder.length) {
+      const record: StoredDailyRecord = {
+        date: dateKey,
+        results: next.map((r) => ({
+          countryId: r.country.id,
+          countryName: r.country.name,
+          stars: r.stars,
+          points: r.points,
+          tiers: r.tiers,
+        })),
+        totalStars: next.reduce((sum, r) => sum + r.stars, 0),
+        totalPoints: next.reduce((sum, r) => sum + r.points, 0),
+      };
+      const newStreak = saveDailyCompletion(record);
+      setStreak(newStreak);
+      setStoredRecord(record);
+      trackGameCompleted(record.totalStars, record.totalPoints, playOrder.length);
+      if (gameStartedAt !== null) {
+        trackGameDuration(Math.round((Date.now() - gameStartedAt) / 1000));
       }
-      return next;
-    });
+      if (session) {
+        recordCompletedGame(session.user.id, record.totalStars, record.totalPoints, newStreak);
+      }
+    }
+    setResults(next);
     setRoundIndex((prev) => prev + 1);
   }
 
-  // Reset removed for now — uncomment this function and the button below to restore it.
+  // Reset hidden for now — uncomment this function and the button below to restore it.
   // /** Restarts the game: clears today's progress and reshuffles the round order. */
   // function handleReset() {
   //   clearDailyRecord(dateKey);
@@ -126,6 +210,7 @@ function App() {
   //   setRoundIndex(0);
   //   setPlayOrder(shuffle(getDailyCountries(dateKey)));
   //   setResetCount((n) => n + 1);
+  //   setGameStartedAt(Date.now());
   // }
 
   async function handleShare() {
@@ -165,19 +250,66 @@ function App() {
   const totalStars = storedRecord?.totalStars ?? results.reduce((sum, r) => sum + r.stars, 0);
   const totalPoints = storedRecord?.totalPoints ?? results.reduce((sum, r) => sum + r.points, 0);
 
+  // The nickname set at sign-up (see LoginScreen), falling back to whatever name Google
+  // shared, then finally the email itself — so there's always something to show once
+  // logged in, even for accounts created before nicknames existed.
+  const displayName = session
+    ? (session.user.user_metadata?.nickname as string | undefined) ||
+      (session.user.user_metadata?.full_name as string | undefined) ||
+      (session.user.user_metadata?.name as string | undefined) ||
+      session.user.email ||
+      'Account'
+    : null;
+
   return (
     <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
-      <header className="mx-auto mb-8 max-w-md text-center md:mb-3">
-        <h1
-          className="bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 bg-clip-text text-4xl font-bold tracking-wide text-transparent md:text-3xl"
-          style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-        >
-          MapsyQuest
-        </h1>
-        <p className="text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
+      {/* Same width/centering trick as MapScope's own wrapper (relative left-1/2 + w-[calc(100vw-2rem)]
+          capped at max-w-2xl, translated back by half its width) so the Menu button's left edge lines
+          up with the map's left border regardless of viewport size. */}
+      <header className="relative left-1/2 z-20 mb-8 grid w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-start md:mb-3">
+        <MenuDropdown
+          onPrivacyPolicy={() => setScreen('privacy')}
+          onLoginClick={() => setScreen('login')}
+          onLogout={handleLogout}
+          userEmail={session?.user.email ?? null}
+        />
+        <div className="min-w-0 text-center">
+          <h1
+            className="truncate bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 bg-clip-text text-lg font-bold tracking-wide text-transparent sm:text-3xl md:text-3xl"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
+            MapsyQuest
+          </h1>
+          <p className="mt-1 truncate text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
+        </div>
+        {displayName && session && <AccountBadge displayName={displayName} userId={session.user.id} />}
       </header>
 
       <main>
+        {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
+
+        {screen === 'feedback' && (
+          <FeedbackScreen
+            onBack={() => setScreen('start')}
+            userEmail={session?.user.email ?? null}
+            userId={session?.user.id ?? null}
+          />
+        )}
+
+        {screen === 'login' && <LoginScreen onBack={() => setScreen('start')} />}
+
+        {screen === 'choose-nickname' && session && (
+          <ChooseNicknameScreen
+            suggestedName={
+              (session.user.user_metadata?.full_name as string | undefined) ||
+              (session.user.user_metadata?.name as string | undefined) ||
+              session.user.email ||
+              'there'
+            }
+            onDone={() => setScreen('start')}
+          />
+        )}
+
         {screen === 'start' && (
           <StartScreen
             totalRounds={playOrder.length}
@@ -185,7 +317,7 @@ function App() {
             totalStars={totalStars}
             totalPoints={totalPoints}
             streak={streak}
-            onPlay={() => setScreen('game')}
+            onPlay={handlePlay}
             onViewResults={() => setScreen('game')}
           />
         )}
@@ -253,7 +385,7 @@ function App() {
               >
                 Share results
               </button>
-              {/* Reset removed for now — uncomment to restore it.
+              {/* Reset hidden for now — uncomment to restore it.
               <button
                 type="button"
                 onClick={handleReset}
@@ -271,9 +403,16 @@ function App() {
             <button
               type="button"
               onClick={() => setScreen('start')}
-              className="text-sm text-slate-400 underline hover:text-slate-200"
+              className="block text-base font-bold text-emerald-400 underline hover:text-emerald-300"
             >
               Return to main screen
+            </button>
+            <button
+              type="button"
+              onClick={() => setScreen('feedback')}
+              className="block text-sm text-slate-400 underline hover:text-slate-200"
+            >
+              Feedback welcome
             </button>
           </div>
         )}
