@@ -21,7 +21,7 @@ import { flagImageUrl } from './lib/flags';
 import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
 import {
-  clearDailyRecord,
+  // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
   loadDailyRecord,
   loadStreak,
   saveDailyCompletion,
@@ -60,23 +60,25 @@ function buildShareText(
   return lines.join('\n');
 }
 
-// DEV-ONLY, used by the Reset button below. To remove: delete this function, the
-// handleReset function, the Reset button JSX, and switch playOrder/resetCount back
-// to their plain useState (no setters) form.
-function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
+// Reset hidden for now — uncomment this function and the button below to restore it.
+// function shuffle<T>(items: T[]): T[] {
+//   const copy = [...items];
+//   for (let i = copy.length - 1; i > 0; i--) {
+//     const j = Math.floor(Math.random() * (i + 1));
+//     [copy[i], copy[j]] = [copy[j], copy[i]];
+//   }
+//   return copy;
+// }
 
 function App() {
   const [dateKey] = useState(() => todayKey());
   // The daily set is deterministic (same 7 countries for everyone, each date), but
   // the play ORDER reshuffles on Reset purely for replay/testing convenience.
-  const [playOrder, setPlayOrder] = useState<Country[]>(() => getDailyCountries(dateKey));
+  // Setter is `_`-prefixed (TS noUnusedLocals exempts underscore-prefixed names) since
+  // its only caller, handleReset, is commented out below. Restoring Reset needs BOTH:
+  // rename `_setPlayOrder` -> `setPlayOrder` here AND uncomment handleReset (which
+  // already calls it as `setPlayOrder`).
+  const [playOrder, _setPlayOrder] = useState<Country[]>(() => getDailyCountries(dateKey));
 
   const [storedRecord, setStoredRecord] = useState<StoredDailyRecord | null>(() =>
     loadDailyRecord(dateKey),
@@ -85,7 +87,9 @@ function App() {
   const [roundIndex, setRoundIndex] = useState(0);
   const [results, setResults] = useState<RoundResult[]>([]);
   // Bumped on reset so RoundFlow remounts even when round 1's country id is unchanged.
-  const [resetCount, setResetCount] = useState(0);
+  // Setter is `_`-prefixed for the same reason as _setPlayOrder above — restore both
+  // together (rename `_setResetCount` -> `setResetCount` here, uncomment handleReset).
+  const [resetCount, _setResetCount] = useState(0);
   const [showCopiedNotice, setShowCopiedNotice] = useState(false);
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
@@ -193,16 +197,17 @@ function App() {
     setRoundIndex((prev) => prev + 1);
   }
 
-  /** DEV-ONLY: restarts the game, clearing today's progress and reshuffling the round order. */
-  function handleReset() {
-    clearDailyRecord(dateKey);
-    setStoredRecord(null);
-    setResults([]);
-    setRoundIndex(0);
-    setPlayOrder(shuffle(getDailyCountries(dateKey)));
-    setResetCount((n) => n + 1);
-    setGameStartedAt(Date.now());
-  }
+  // Reset hidden for now — uncomment this function and the button below to restore it.
+  // /** Restarts the game: clears today's progress and reshuffles the round order. */
+  // function handleReset() {
+  //   clearDailyRecord(dateKey);
+  //   setStoredRecord(null);
+  //   setResults([]);
+  //   setRoundIndex(0);
+  //   setPlayOrder(shuffle(getDailyCountries(dateKey)));
+  //   setResetCount((n) => n + 1);
+  //   setGameStartedAt(Date.now());
+  // }
 
   async function handleShare() {
     const text = buildShareText(
@@ -367,7 +372,7 @@ function App() {
               >
                 Share results
               </button>
-              {/* DEV-ONLY: remove this button (and handleReset/shuffle above) to ship without a reset option. */}
+              {/* Reset hidden for now — uncomment to restore it.
               <button
                 type="button"
                 onClick={handleReset}
@@ -375,6 +380,7 @@ function App() {
               >
                 Reset
               </button>
+              */}
             </div>
             {showCopiedNotice && (
               <p role="status" className="text-sm text-emerald-400">
