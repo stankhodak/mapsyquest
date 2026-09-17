@@ -7,6 +7,7 @@ import {
   trackGameStarted,
   trackRoundCompleted,
 } from './lib/analytics';
+import { AccountBadge } from './components/AccountBadge';
 import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
@@ -17,6 +18,7 @@ import { getCountryById } from './data/countries';
 import type { Country } from './data/types';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
+import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
 import {
   clearDailyRecord,
@@ -176,11 +178,15 @@ function App() {
         totalStars: next.reduce((sum, r) => sum + r.stars, 0),
         totalPoints: next.reduce((sum, r) => sum + r.points, 0),
       };
-      setStreak(saveDailyCompletion(record));
+      const newStreak = saveDailyCompletion(record);
+      setStreak(newStreak);
       setStoredRecord(record);
       trackGameCompleted(record.totalStars, record.totalPoints, playOrder.length);
       if (gameStartedAt !== null) {
         trackGameDuration(Math.round((Date.now() - gameStartedAt) / 1000));
+      }
+      if (session) {
+        recordCompletedGame(session.user.id, record.totalStars, record.totalPoints, newStreak);
       }
     }
     setResults(next);
@@ -266,14 +272,7 @@ function App() {
           </h1>
           <p className="mt-1 truncate text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
         </div>
-        {displayName && (
-          <div
-            title={displayName}
-            className="min-w-0 max-w-full justify-self-end truncate rounded-xl bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-3 py-2 text-sm font-bold text-slate-950 shadow-lg sm:px-5 sm:py-2.5 sm:text-base"
-          >
-            {displayName}
-          </div>
-        )}
+        {displayName && session && <AccountBadge displayName={displayName} userId={session.user.id} />}
       </header>
 
       <main>
