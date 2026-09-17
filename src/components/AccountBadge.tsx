@@ -56,34 +56,38 @@ export function AccountBadge({ displayName, userId }: AccountBadgeProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-10 mt-2 w-52 rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-slate-800 to-slate-900 p-4 text-left shadow-xl shadow-emerald-500/10">
-          <p className="mb-2 truncate text-xs text-slate-500" title={displayName}>
-            {displayName}
-          </p>
-
-          {isLoading && <p className="text-sm text-slate-400">Loading stats…</p>}
+        <div className="absolute right-0 top-full z-10 mt-2 w-56 rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-slate-800 to-slate-900 p-4 text-left shadow-xl shadow-emerald-500/10">
+          {isLoading && <p className="font-semibold text-slate-200">Loading stats…</p>}
 
           {!isLoading && stats && (
             <dl className="space-y-1.5 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-slate-400">Games played</dt>
-                <dd className="font-semibold text-slate-100">{stats.gamesPlayed}</dd>
+                <dt className="font-semibold text-slate-200">Games played</dt>
+                <dd className="font-bold text-white">{stats.gamesPlayed}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-slate-400">⭐ Total stars</dt>
-                <dd className="font-semibold text-slate-100">{stats.totalStars}</dd>
+                <dt className="font-semibold text-slate-200">⭐ Total stars</dt>
+                <dd className="font-bold text-white">{stats.totalStars}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-slate-400">🏆 Total points</dt>
-                <dd className="font-semibold text-slate-100">{stats.totalPoints}</dd>
+                <dt className="font-semibold text-slate-200">🏆 Total points</dt>
+                <dd className="font-bold text-white">{stats.totalPoints}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-slate-400">🔥 Current streak</dt>
-                <dd className="font-semibold text-slate-100">{stats.currentStreak}</dd>
+                <dt className="font-semibold text-slate-200">🌟 Best total stars</dt>
+                <dd className="font-bold text-white">{stats.bestStars}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-slate-400">Best streak</dt>
-                <dd className="font-semibold text-slate-100">{stats.maxStreak}</dd>
+                <dt className="font-semibold text-slate-200">💎 Best total points</dt>
+                <dd className="font-bold text-white">{stats.bestPoints}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="font-semibold text-slate-200">🔥 Current streak</dt>
+                <dd className="font-bold text-white">{stats.currentStreak}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="font-semibold text-slate-200">Best streak</dt>
+                <dd className="font-bold text-white">{stats.maxStreak}</dd>
               </div>
             </dl>
           )}
