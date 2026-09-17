@@ -280,7 +280,6 @@ function App() {
           >
             MapsyQuest
           </h1>
-          <p className="mt-1 truncate text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
         </div>
         {displayName && session && <AccountBadge displayName={displayName} userId={session.user.id} />}
       </header>
