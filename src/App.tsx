@@ -33,6 +33,7 @@ function buildShareText(
   totalPoints: number,
   streakDays: number,
   rows: SummaryRow[],
+  siteUrl: string,
 ): string {
   const lines = [
     `MapsyQuest — ${dateKey}`,
@@ -40,7 +41,7 @@ function buildShareText(
     '',
     ...rows.map((r) => `${tierIcon(r.tiers?.country)}${tierIcon(r.tiers?.capital)}${tierIcon(r.tiers?.flag)}`),
     '',
-    'https://mapsyquest.vercel.app/',
+    siteUrl,
   ];
   return lines.join('\n');
 }
@@ -135,6 +136,7 @@ function App() {
       totalPoints,
       streak.currentStreak,
       summaryRows,
+      `${window.location.origin}/`,
     );
     try {
       await navigator.clipboard.writeText(text);
