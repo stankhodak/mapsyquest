@@ -9,6 +9,7 @@ import {
 } from './lib/analytics';
 import { AccountBadge } from './components/AccountBadge';
 import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
+import { FeedbackScreen } from './components/FeedbackScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
@@ -94,7 +95,9 @@ function App() {
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
-  const [screen, setScreen] = useState<'start' | 'game' | 'privacy' | 'login' | 'choose-nickname'>('start');
+  const [screen, setScreen] = useState<
+    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback'
+  >('start');
   const [session, setSession] = useState<Session | null>(null);
   // Set when the player presses Play (or dev-Resets); null once the round data itself
   // (results/roundIndex) has been cleared without a fresh play, so the game_abandoned
@@ -283,6 +286,14 @@ function App() {
       <main>
         {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
 
+        {screen === 'feedback' && (
+          <FeedbackScreen
+            onBack={() => setScreen('start')}
+            userEmail={session?.user.email ?? null}
+            userId={session?.user.id ?? null}
+          />
+        )}
+
         {screen === 'login' && <LoginScreen onBack={() => setScreen('start')} />}
 
         {screen === 'choose-nickname' && session && (
@@ -390,9 +401,16 @@ function App() {
             <button
               type="button"
               onClick={() => setScreen('start')}
-              className="text-sm text-slate-400 underline hover:text-slate-200"
+              className="block text-base font-bold text-emerald-400 underline hover:text-emerald-300"
             >
               Return to main screen
+            </button>
+            <button
+              type="button"
+              onClick={() => setScreen('feedback')}
+              className="block text-sm text-slate-400 underline hover:text-slate-200"
+            >
+              Feedback welcome
             </button>
           </div>
         )}
