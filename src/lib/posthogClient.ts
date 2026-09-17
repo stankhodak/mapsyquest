@@ -9,6 +9,9 @@ export const isPostHogConfigured = Boolean(posthogKey);
 if (isPostHogConfigured) {
   posthog.init(posthogKey, {
     api_host: 'https://eu.i.posthog.com',
+    // Pins the SDK default-behavior set to what the project's own setup snippet
+    // recommends, rather than silently drifting as PostHog ships new defaults.
+    defaults: '2026-05-30',
     // Avoids creating a full person profile for every anonymous visitor — we don't
     // currently call posthog.identify() (no tie-in to Supabase accounts), so there's
     // no "identified" user to merge profiles for anyway.
