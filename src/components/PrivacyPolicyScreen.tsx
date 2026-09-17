@@ -32,12 +32,13 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
       </p>
 
       <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-        <p className="font-semibold text-slate-200">Looking ahead</p>
+        <p className="font-semibold text-slate-200">Account stats</p>
         <p>
-          Creating an account currently just identifies you (email, or your Google name/photo, and an optional
-          nickname) — your game progress stays local to your browser. As we build out more features, logging in
-          may come to mean we track and store your progress, statistics, and other account-related data on our
-          servers. We're telling you this now so it's not a surprise later.
+          If you're logged in, we save a running summary of your play to your account — games played, your best
+          single-game star/point totals, and your current and best streak — so it doesn't disappear if you clear
+          your browser or switch devices. Your day-by-day round results (which countries, capitals, and flags you
+          were asked and how you answered) always stay local to your browser and are never sent to us, logged in
+          or not.
         </p>
       </div>
 
@@ -66,10 +67,11 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
               Google shares if you sign in that way. If you set a nickname, we store that too.
             </>,
             <>
-              <span className="font-semibold text-slate-200">Game data:</span> your daily progress, stars,
-              points, and streak. This currently lives entirely in your own browser's local storage — it is not
-              sent to or stored on our servers, and isn't tied to your account even if you're logged in (see
-              "Looking ahead" above).
+              <span className="font-semibold text-slate-200">Game data:</span> your day-by-day round results
+              (which countries, capitals, and flags you were asked, and how you answered) live entirely in your
+              own browser's local storage and are never sent to us. If you're logged in, we additionally store a
+              running summary tied to your account — games played, best single-game star/point totals, and
+              current/best streak (see "Account stats" above).
             </>,
             <>
               <span className="font-semibold text-slate-200">Usage information:</span> technical and analytics
@@ -140,8 +142,8 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
         <SectionHeading>Data retention</SectionHeading>
         <BulletList
           items={[
-            'Account data is retained until you ask us to delete it.',
-            "Game progress and streak, stored locally in your browser, are retained until you clear your browser's site data for MapsyQuest — we have no way to do this for you remotely.",
+            'Account information and your saved stats summary are retained until you ask us to delete them.',
+            "Your day-by-day round results, stored locally in your browser, are retained until you clear your browser's site data for MapsyQuest — we have no way to do this for you remotely.",
             "Analytics data is retained according to Vercel's and PostHog's own retention practices.",
           ]}
         />
@@ -152,7 +154,7 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
         <BulletList
           items={[
             'You can play MapsyQuest without ever creating an account.',
-            "You can clear your browser's site data at any time to remove your locally-stored progress and streak.",
+            "You can clear your browser's site data at any time to remove your locally-stored day-by-day round results (this doesn't remove your saved account stats — contact us for that).",
             'You can contact us to ask about, correct, or request deletion of your account and any personal information we hold.',
           ]}
         />
