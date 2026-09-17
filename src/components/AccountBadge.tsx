@@ -66,19 +66,11 @@ export function AccountBadge({ displayName, userId }: AccountBadgeProps) {
                 <dd className="font-bold text-white">{stats.gamesPlayed}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="font-semibold text-slate-200">⭐ Total stars</dt>
-                <dd className="font-bold text-white">{stats.totalStars}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="font-semibold text-slate-200">🏆 Total points</dt>
-                <dd className="font-bold text-white">{stats.totalPoints}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="font-semibold text-slate-200">🌟 Best total stars</dt>
+                <dt className="font-semibold text-slate-200">⭐ Best total stars</dt>
                 <dd className="font-bold text-white">{stats.bestStars}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="font-semibold text-slate-200">💎 Best total points</dt>
+                <dt className="font-semibold text-slate-200">🏆 Best total points</dt>
                 <dd className="font-bold text-white">{stats.bestPoints}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
