@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
+import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
@@ -80,7 +81,7 @@ function App() {
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
-  const [screen, setScreen] = useState<'start' | 'game' | 'privacy' | 'login'>('start');
+  const [screen, setScreen] = useState<'start' | 'game' | 'privacy' | 'login' | 'choose-nickname'>('start');
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
@@ -89,13 +90,29 @@ function App() {
     return () => clearTimeout(timer);
   }, [showCopiedNotice]);
 
+  // Google sign-in never goes through LoginScreen's own nickname field (it redirects
+  // straight to Google), so this is how those players get offered one — once, the
+  // first time, tracked via user_metadata.nicknamePrompted rather than re-asking on
+  // every login.
+  function maybePromptNickname(newSession: Session | null) {
+    const metadata = newSession?.user.user_metadata;
+    const isGoogleAccount = newSession?.user.app_metadata.provider === 'google';
+    if (isGoogleAccount && !metadata?.nickname && !metadata?.nicknamePrompted) {
+      setScreen('choose-nickname');
+    }
+  }
+
   // Picks up the session Supabase restores from storage on load, and the one it sets
   // after a Google OAuth redirect back into the app (both go through this callback).
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      maybePromptNickname(data.session);
+    });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
+      maybePromptNickname(newSession);
     });
     return () => subscription.subscription.unsubscribe();
   }, []);
@@ -209,7 +226,7 @@ function App() {
           >
             MapsyQuest
           </h1>
-          <p className="truncate text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
+          <p className="mt-1 truncate text-sm text-slate-400">Daily geography guessing game — {dateKey}</p>
         </div>
         {displayName && (
           <div
@@ -225,6 +242,18 @@ function App() {
         {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
 
         {screen === 'login' && <LoginScreen onBack={() => setScreen('start')} />}
+
+        {screen === 'choose-nickname' && session && (
+          <ChooseNicknameScreen
+            suggestedName={
+              (session.user.user_metadata?.full_name as string | undefined) ||
+              (session.user.user_metadata?.name as string | undefined) ||
+              session.user.email ||
+              'there'
+            }
+            onDone={() => setScreen('start')}
+          />
+        )}
 
         {screen === 'start' && (
           <StartScreen

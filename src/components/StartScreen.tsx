@@ -59,7 +59,7 @@ export function StartScreen({
       <div className="space-y-1">
         <h2 className="text-xl font-bold text-slate-100">The Daily Geography Challenge</h2>
         <p className="text-sm text-slate-400">
-          {totalRounds} countries a day — nail the country, capital, and flag for each.
+          Guess {totalRounds} countries, their capitals and flags.
         </p>
       </div>
 
