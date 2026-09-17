@@ -1,5 +1,12 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
+import {
+  trackGameAbandoned,
+  trackGameCompleted,
+  trackGameDuration,
+  trackGameStarted,
+  trackRoundCompleted,
+} from './lib/analytics';
 import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
@@ -83,12 +90,29 @@ function App() {
   // being dropped straight into their old results.
   const [screen, setScreen] = useState<'start' | 'game' | 'privacy' | 'login' | 'choose-nickname'>('start');
   const [session, setSession] = useState<Session | null>(null);
+  // Set when the player presses Play (or dev-Resets); null once the round data itself
+  // (results/roundIndex) has been cleared without a fresh play, so the game_abandoned
+  // check below can tell "actively mid-game" apart from "sitting on the start screen".
+  const [gameStartedAt, setGameStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (!showCopiedNotice) return;
     const timer = setTimeout(() => setShowCopiedNotice(false), 1800);
     return () => clearTimeout(timer);
   }, [showCopiedNotice]);
+
+  // Reports a game_abandoned event if the tab closes/navigates away while a round is
+  // in progress. pagehide (not beforeunload) so it still fires on mobile Safari and
+  // doesn't block the page from entering the back/forward cache.
+  useEffect(() => {
+    function handlePageHide() {
+      if (gameStartedAt !== null && roundIndex < playOrder.length) {
+        trackGameAbandoned(roundIndex + 1);
+      }
+    }
+    window.addEventListener('pagehide', handlePageHide);
+    return () => window.removeEventListener('pagehide', handlePageHide);
+  }, [gameStartedAt, roundIndex, playOrder.length]);
 
   // Google sign-in never goes through LoginScreen's own nickname field (it redirects
   // straight to Google), so this is how those players get offered one — once, the
@@ -126,27 +150,40 @@ function App() {
   // letting the player replay.
   const isGameOver = storedRecord !== null || roundIndex >= playOrder.length;
 
+  function handlePlay() {
+    trackGameStarted();
+    setGameStartedAt(Date.now());
+    setScreen('game');
+  }
+
   function handleRoundComplete(result: RoundResult) {
-    setResults((prev) => {
-      const next = [...prev, result];
-      if (next.length === playOrder.length) {
-        const record: StoredDailyRecord = {
-          date: dateKey,
-          results: next.map((r) => ({
-            countryId: r.country.id,
-            countryName: r.country.name,
-            stars: r.stars,
-            points: r.points,
-            tiers: r.tiers,
-          })),
-          totalStars: next.reduce((sum, r) => sum + r.stars, 0),
-          totalPoints: next.reduce((sum, r) => sum + r.points, 0),
-        };
-        setStreak(saveDailyCompletion(record));
-        setStoredRecord(record);
+    trackRoundCompleted(roundIndex + 1, result.stars, result.points);
+    // Built from `results` directly (not a setResults functional updater) specifically
+    // so the trackGameCompleted/trackGameDuration calls below run exactly once — a side
+    // effect inside a state updater gets double-invoked by StrictMode in dev (and isn't
+    // guaranteed once in general), which was firing these analytics events twice.
+    const next = [...results, result];
+    if (next.length === playOrder.length) {
+      const record: StoredDailyRecord = {
+        date: dateKey,
+        results: next.map((r) => ({
+          countryId: r.country.id,
+          countryName: r.country.name,
+          stars: r.stars,
+          points: r.points,
+          tiers: r.tiers,
+        })),
+        totalStars: next.reduce((sum, r) => sum + r.stars, 0),
+        totalPoints: next.reduce((sum, r) => sum + r.points, 0),
+      };
+      setStreak(saveDailyCompletion(record));
+      setStoredRecord(record);
+      trackGameCompleted(record.totalStars, record.totalPoints, playOrder.length);
+      if (gameStartedAt !== null) {
+        trackGameDuration(Math.round((Date.now() - gameStartedAt) / 1000));
       }
-      return next;
-    });
+    }
+    setResults(next);
     setRoundIndex((prev) => prev + 1);
   }
 
@@ -158,6 +195,7 @@ function App() {
     setRoundIndex(0);
     setPlayOrder(shuffle(getDailyCountries(dateKey)));
     setResetCount((n) => n + 1);
+    setGameStartedAt(Date.now());
   }
 
   async function handleShare() {
@@ -262,7 +300,7 @@ function App() {
             totalStars={totalStars}
             totalPoints={totalPoints}
             streak={streak}
-            onPlay={() => setScreen('game')}
+            onPlay={handlePlay}
             onViewResults={() => setScreen('game')}
           />
         )}
