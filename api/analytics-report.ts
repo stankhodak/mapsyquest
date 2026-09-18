@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { generateReportMessage, safeCompare, sendTelegramMessage, todayRange } from './_lib/analytics';
+import { generateReportMessage, safeCompare, sendTelegramMessage, todayRange } from './_lib/analytics.js';
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;

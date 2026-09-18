@@ -6,7 +6,7 @@ import {
   sendTelegramMessage,
   todayRange,
   yesterdayRange,
-} from './_lib/analytics';
+} from './_lib/analytics.js';
 
 /** Vercel's Node.js runtime auto-parses a JSON request body into `req.body` even for a
  * plain (req, res) handler like this one — no @vercel/node dependency needed for it. */
