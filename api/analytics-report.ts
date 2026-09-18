@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 
 /** No fixed server timezone exists elsewhere in the app (each player's "today" is their
  * own local midnight — see src/lib/daily.ts) — Spain is picked here as the operator's
@@ -19,19 +20,19 @@ interface DurationRow {
   medianSeconds: number | null;
 }
 
-function unauthorized(): Response {
-  return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
-    status: 401,
-    headers: { 'content-type': 'application/json' },
-  });
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.statusCode = status;
+  res.setHeader('content-type', 'application/json');
+  res.end(JSON.stringify(body));
 }
 
 /** Constant-time secret comparison — a plain `===` leaks timing info byte-by-byte. */
-function isAuthorized(request: Request): boolean {
+function isAuthorized(req: IncomingMessage): boolean {
   const expected = process.env.ANALYTICS_REPORT_SECRET;
   if (!expected) return false;
 
-  const header = request.headers.get('authorization') ?? '';
+  const headerValue = req.headers.authorization;
+  const header = Array.isArray(headerValue) ? headerValue[0] : (headerValue ?? '');
   const [scheme, token] = header.split(' ');
   if (scheme !== 'Bearer' || !token) return false;
 
@@ -159,33 +160,26 @@ async function sendTelegramMessage(text: string): Promise<void> {
   }
 }
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'GET') {
-    return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'content-type': 'application/json' },
-    });
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, { ok: false, error: 'Method not allowed' });
+    return;
   }
 
-  if (!isAuthorized(request)) {
-    return unauthorized();
+  if (!isAuthorized(req)) {
+    sendJson(res, 401, { ok: false, error: 'Unauthorized' });
+    return;
   }
 
   try {
     const [counts, duration] = await Promise.all([fetchCounts(), fetchDurationStats()]);
     const message = buildMessage(counts, duration);
     await sendTelegramMessage(message);
-    return new Response(JSON.stringify({ ok: true, message }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
+    sendJson(res, 200, { ok: true, message });
   } catch (error) {
     // Logged server-side only — the client response stays generic so it can never
     // surface PostHog/Telegram credentials or account details from an error message.
     console.error('analytics-report failed:', error);
-    return new Response(JSON.stringify({ ok: false, error: 'Failed to generate or send the analytics report' }), {
-      status: 502,
-      headers: { 'content-type': 'application/json' },
-    });
+    sendJson(res, 502, { ok: false, error: 'Failed to generate or send the analytics report' });
   }
 }
