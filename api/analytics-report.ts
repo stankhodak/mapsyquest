@@ -109,7 +109,7 @@ async function fetchCounts(): Promise<CountsRow> {
       countIf(event = 'round_completed') AS rounds_completed
     FROM events
     WHERE event IN ('game_started', 'game_completed', 'round_completed')
-      AND toDate(toTimezone(timestamp, '${REPORT_TIMEZONE}')) = toDate(toTimezone(now(), '${REPORT_TIMEZONE}'))
+      AND toDate(toTimeZone(timestamp, '${REPORT_TIMEZONE}')) = toDate(toTimeZone(now(), '${REPORT_TIMEZONE}'))
   `,
     'counts',
   );
@@ -130,7 +130,7 @@ async function fetchDurationStats(): Promise<DurationRow> {
       quantile(0.5)(toFloat64OrNull(properties.seconds)) AS median_seconds
     FROM events
     WHERE event = 'game_duration'
-      AND toDate(toTimezone(timestamp, '${REPORT_TIMEZONE}')) = toDate(toTimezone(now(), '${REPORT_TIMEZONE}'))
+      AND toDate(toTimeZone(timestamp, '${REPORT_TIMEZONE}')) = toDate(toTimeZone(now(), '${REPORT_TIMEZONE}'))
   `,
     'duration',
   );
