@@ -29,17 +29,34 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 /** Constant-time secret comparison — a plain `===` leaks timing info byte-by-byte. */
 function isAuthorized(req: IncomingMessage): boolean {
   const expected = process.env.ANALYTICS_REPORT_SECRET;
-  if (!expected) return false;
 
   const headerValue = req.headers.authorization;
   const header = Array.isArray(headerValue) ? headerValue[0] : (headerValue ?? '');
-  const [scheme, token] = header.split(' ');
-  if (scheme !== 'Bearer' || !token) return false;
+  const [scheme, rawToken] = header.split(' ');
+  // Trimmed defensively: a secret pasted into the Vercel dashboard (or a value piped
+  // from a shell) commonly picks up a trailing newline/space, which would otherwise
+  // fail the length check below despite the visible value being identical.
+  const token = (rawToken ?? '').trim();
+  const expectedTrimmed = (expected ?? '').trim();
 
-  const expectedBuf = Buffer.from(expected);
-  const tokenBuf = Buffer.from(token);
-  if (expectedBuf.length !== tokenBuf.length) return false;
-  return timingSafeEqual(expectedBuf, tokenBuf);
+  let valuesMatch = false;
+  if (expectedTrimmed && scheme === 'Bearer' && token) {
+    const expectedBuf = Buffer.from(expectedTrimmed);
+    const tokenBuf = Buffer.from(token);
+    valuesMatch = expectedBuf.length === tokenBuf.length && timingSafeEqual(expectedBuf, tokenBuf);
+  }
+
+  // TEMPORARY DIAGNOSTIC LOGGING — remove once the auth mismatch is confirmed fixed.
+  // Reports only booleans/lengths; never logs the header value or the secret itself.
+  console.log('[analytics-report][diag]', {
+    authHeaderReceived: header.length > 0,
+    envSecretExists: Boolean(expected),
+    authHeaderLength: header.length,
+    envSecretLength: expected?.length ?? 0,
+    valuesMatch,
+  });
+
+  return Boolean(expectedTrimmed) && valuesMatch;
 }
 
 /** Runs a HogQL query via PostHog's Query API and returns its first result row. Throws
