@@ -76,7 +76,12 @@ async function runHogQLQuery(query: string, label: string): Promise<unknown[]> {
       Authorization: `Bearer ${apiKey}`,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ query: { kind: 'HogQLQuery', query } }),
+    // Without `refresh`, PostHog's Query API is free to serve a cached result instead of
+    // calculating one live. Both HogQL queries here compute "today" via now() rather than
+    // a value bound from this request, so their query text is identical on every call —
+    // exactly what PostHog's cache keys on — making a stale cache hit likely rather than
+    // hypothetical. force_blocking always (re)calculates and waits for the live result.
+    body: JSON.stringify({ query: { kind: 'HogQLQuery', query }, refresh: 'force_blocking' }),
   });
 
   if (!response.ok) {
