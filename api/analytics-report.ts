@@ -61,8 +61,9 @@ function isAuthorized(req: IncomingMessage): boolean {
 
 /** Runs a HogQL query via PostHog's Query API and returns its first result row. Throws
  * on any non-2xx or malformed response — callers must not leak the raw error to clients,
- * since it can echo back the query and project details. */
-async function runHogQLQuery(query: string): Promise<unknown[]> {
+ * since it can echo back the query and project details. `label` only identifies which
+ * query failed in the diagnostic log below; it carries no credentials. */
+async function runHogQLQuery(query: string, label: string): Promise<unknown[]> {
   const apiKey = process.env.POSTHOG_PERSONAL_API_KEY;
   const projectId = process.env.POSTHOG_PROJECT_ID;
   if (!apiKey || !projectId) {
@@ -79,6 +80,14 @@ async function runHogQLQuery(query: string): Promise<unknown[]> {
   });
 
   if (!response.ok) {
+    // TEMPORARY DIAGNOSTIC LOGGING — remove once the 400 is root-caused. Logs PostHog's
+    // own validation error body so we can see exactly what it rejected. Never logs the
+    // API key, the Authorization header, or any other credential.
+    const body = await response.text().catch(() => '<unreadable response body>');
+    console.error(`[analytics-report][posthog] "${label}" query rejected`, {
+      status: response.status,
+      body,
+    });
     throw new Error(`PostHog query failed with status ${response.status}`);
   }
 
@@ -91,7 +100,8 @@ async function runHogQLQuery(query: string): Promise<unknown[]> {
 }
 
 async function fetchCounts(): Promise<CountsRow> {
-  const row = await runHogQLQuery(`
+  const row = await runHogQLQuery(
+    `
     SELECT
       uniqIf(distinct_id, event = 'game_started') AS players,
       countIf(event = 'game_started') AS games_started,
@@ -100,7 +110,9 @@ async function fetchCounts(): Promise<CountsRow> {
     FROM events
     WHERE event IN ('game_started', 'game_completed', 'round_completed')
       AND toDate(toTimezone(timestamp, '${REPORT_TIMEZONE}')) = toDate(toTimezone(now(), '${REPORT_TIMEZONE}'))
-  `);
+  `,
+    'counts',
+  );
 
   return {
     players: Number(row[0]),
@@ -111,14 +123,17 @@ async function fetchCounts(): Promise<CountsRow> {
 }
 
 async function fetchDurationStats(): Promise<DurationRow> {
-  const row = await runHogQLQuery(`
+  const row = await runHogQLQuery(
+    `
     SELECT
       avg(toFloat64OrNull(properties.seconds)) AS avg_seconds,
       quantile(0.5)(toFloat64OrNull(properties.seconds)) AS median_seconds
     FROM events
     WHERE event = 'game_duration'
       AND toDate(toTimezone(timestamp, '${REPORT_TIMEZONE}')) = toDate(toTimezone(now(), '${REPORT_TIMEZONE}'))
-  `);
+  `,
+    'duration',
+  );
 
   return {
     avgSeconds: row[0] === null ? null : Number(row[0]),
