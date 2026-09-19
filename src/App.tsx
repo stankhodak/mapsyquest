@@ -14,6 +14,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
 import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
+import { MoreChallengesScreen } from './components/MoreChallengesScreen';
 import { StartScreen } from './components/StartScreen';
 import { getCountryById } from './data/countries';
 import type { Country } from './data/types';
@@ -97,7 +98,7 @@ function App() {
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
   const [screen, setScreen] = useState<
-    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback'
+    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback' | 'more-challenges'
   >('start');
   const [session, setSession] = useState<Session | null>(null);
   // Set when the player presses Play (or dev-Resets); null once the round data itself
@@ -318,8 +319,11 @@ function App() {
             streak={streak}
             onPlay={handlePlay}
             onViewResults={() => setScreen('game')}
+            onMoreChallenges={() => setScreen('more-challenges')}
           />
         )}
+
+        {screen === 'more-challenges' && <MoreChallengesScreen onBack={() => setScreen('start')} />}
 
         {screen === 'game' && !isGameOver && (
           <RoundFlow

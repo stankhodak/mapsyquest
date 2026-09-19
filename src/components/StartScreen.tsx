@@ -11,6 +11,7 @@ interface StartScreenProps {
   streak: StreakState;
   onPlay: () => void;
   onViewResults: () => void;
+  onMoreChallenges: () => void;
 }
 
 function formatCountdown(ms: number): string {
@@ -48,6 +49,7 @@ export function StartScreen({
   streak,
   onPlay,
   onViewResults,
+  onMoreChallenges,
 }: StartScreenProps) {
   const countdown = useCountdownToNextDay(isLocked);
 
@@ -102,6 +104,14 @@ export function StartScreen({
           Play today's challenge
         </button>
       )}
+
+      <button
+        type="button"
+        onClick={onMoreChallenges}
+        className="w-full rounded-xl border border-slate-700 bg-slate-900/60 px-6 py-3 text-lg font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 active:scale-[0.98]"
+      >
+        More Challenges
+      </button>
     </div>
   );
 }
