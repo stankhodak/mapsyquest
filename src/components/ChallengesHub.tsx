@@ -11,12 +11,14 @@ import {
 } from '../lib/challenges';
 import type { Country } from '../data/types';
 import { ChallengeGame } from './ChallengeGame';
+import type { LeaderboardAccount } from './LeaderboardOffer';
 
 interface ChallengesHubProps {
   /** Back to the main start screen. */
   onBack: () => void;
-  isSignedIn: boolean;
+  account: LeaderboardAccount | null;
   onLogin: () => void;
+  onViewBoard: (board: string) => void;
 }
 
 type HubView = { name: 'menu' } | { name: 'regions' } | { name: 'regional-format'; region: RegionId };
@@ -64,7 +66,7 @@ function BackLink({ onClick, children }: { onClick: () => void; children: ReactN
   );
 }
 
-export function ChallengesHub({ onBack, isSignedIn, onLogin }: ChallengesHubProps) {
+export function ChallengesHub({ onBack, account, onLogin, onViewBoard }: ChallengesHubProps) {
   const [view, setView] = useState<HubView>({ name: 'menu' });
   const [game, setGame] = useState<ActiveGame | null>(null);
 
@@ -78,8 +80,9 @@ export function ChallengesHub({ onBack, isSignedIn, onLogin }: ChallengesHubProp
         key={game.gameId}
         kind={game.setup.kind}
         region={game.setup.region}
-        isSignedIn={isSignedIn}
+        account={account}
         onLogin={onLogin}
+        onViewBoard={onViewBoard}
         title={challengeTitle(game.setup)}
         countries={game.countries}
         onPlayAgain={() => startGame(game.setup, game.gameId)}
@@ -116,6 +119,12 @@ export function ChallengesHub({ onBack, isSignedIn, onLogin }: ChallengesHubProp
             emoji="🚩"
             title="Flag Challenge"
             description={`${CHALLENGE_ROUNDS.flag} flags — type the country each one belongs to.`}
+          />
+          <ChoiceButton
+            onClick={() => onViewBoard('daily')}
+            emoji="🏆"
+            title="Leaderboards"
+            description="See how the top players rank."
           />
           <div className="pt-1 text-center">
             <BackLink onClick={onBack}>Return to main screen</BackLink>

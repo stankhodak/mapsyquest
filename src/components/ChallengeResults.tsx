@@ -2,7 +2,8 @@ import type { Country } from '../data/types';
 import type { EarnedAchievement } from '../lib/achievements';
 import { flagImageUrl } from '../lib/flags';
 import { AchievementsPanel } from './AchievementsPanel';
-import { LeaderboardOffer } from './LeaderboardOffer';
+import type { BoardEntry } from '../lib/leaderboard';
+import { LeaderboardOffer, type LeaderboardAccount } from './LeaderboardOffer';
 
 export interface RoundOutcome {
   country: Country;
@@ -20,8 +21,10 @@ interface ChallengeResultsProps {
   subLines: string[];
   outcomes: RoundOutcome[];
   earned: EarnedAchievement[];
-  isSignedIn: boolean;
+  entry: BoardEntry | null;
+  account: LeaderboardAccount | null;
   onLogin: () => void;
+  onViewBoard: (board: string) => void;
   onPlayAgain: () => void;
   onExit: () => void;
 }
@@ -32,8 +35,10 @@ export function ChallengeResults({
   subLines,
   outcomes,
   earned,
-  isSignedIn,
+  entry,
+  account,
   onLogin,
+  onViewBoard,
   onPlayAgain,
   onExit,
 }: ChallengeResultsProps) {
@@ -50,7 +55,7 @@ export function ChallengeResults({
       </div>
 
       <AchievementsPanel earned={earned} />
-      <LeaderboardOffer isSignedIn={isSignedIn} onLogin={onLogin} />
+      <LeaderboardOffer entry={entry} account={account} onLogin={onLogin} onViewBoard={onViewBoard} />
 
       <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60">
         {outcomes.map((outcome) => (

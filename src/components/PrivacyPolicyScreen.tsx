@@ -23,7 +23,7 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
     <div className="mx-auto w-full max-w-md space-y-5 text-left text-sm text-slate-300">
       <div>
         <h2 className="text-xl font-bold text-slate-100">Privacy Policy</h2>
-        <p className="text-xs text-slate-500">Last updated: September 17, 2026</p>
+        <p className="text-xs text-slate-500">Last updated: September 19, 2026</p>
       </div>
 
       <p>
@@ -71,7 +71,14 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
               (which countries, capitals, and flags you were asked, and how you answered) live entirely in your
               own browser's local storage and are never sent to us. If you're logged in, we additionally store a
               running summary tied to your account — games played, best single-game star/point totals, and
-              current/best streak (see "Account stats" above).
+              current/best streak (see "Account stats" above). Your achievements progress (which achievements
+              you've earned, and counters like games played) is also kept only in your own browser.
+            </>,
+            <>
+              <span className="font-semibold text-slate-200">Leaderboard posts (only if you choose to post):</span>{' '}
+              when you press "Add to leaderboard" while logged in, we store the nickname you chose, the score, the
+              star total, the game board and date, and the achievements that game earned. Nothing is posted
+              unless you press that button.
             </>,
             <>
               <span className="font-semibold text-slate-200">Usage information:</span> technical and analytics
@@ -124,6 +131,12 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
           ]}
         />
         <p>
+          <span className="font-semibold text-slate-200">Leaderboards are public.</span> A score you post, with
+          the nickname you chose, is visible to every visitor. We never show your email address or full name on a
+          leaderboard: if Google shared your name we only pre-fill its first word in the nickname box, and you
+          confirm or change it before posting.
+        </p>
+        <p>
           We may also disclose information when required by law, to protect rights and safety, or in connection
           with a merger, acquisition, financing, or sale of assets.
         </p>
@@ -143,6 +156,7 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
         <BulletList
           items={[
             'Account information and your saved stats summary are retained until you ask us to delete them.',
+            'Scores you post to a leaderboard are retained until you ask us to delete them.',
             "Your day-by-day round results, stored locally in your browser, are retained until you clear your browser's site data for MapsyQuest — we have no way to do this for you remotely.",
             "Analytics data is retained according to Vercel's and PostHog's own retention practices.",
           ]}

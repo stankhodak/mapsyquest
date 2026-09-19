@@ -159,7 +159,7 @@ export function bestKey(game: GameSummary): string {
 }
 
 /** The number a personal best is measured in: seconds for the Time Challenge (lower wins), points otherwise. */
-function bestValue(game: GameSummary): number {
+export function bestValue(game: GameSummary): number {
   return game.kind === 'time' ? (game.timeSeconds ?? Number.NaN) : totalPoints(game);
 }
 

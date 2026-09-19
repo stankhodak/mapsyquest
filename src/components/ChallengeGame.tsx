@@ -9,10 +9,13 @@ import {
   type ChallengeKind,
   type RegionId,
 } from '../lib/challenges';
+import { todayKey } from '../lib/daily';
 import { buildGameSummary, countryRoundSummary, fullRoundSummary } from '../lib/gameSummaries';
+import { buildEntry, type BoardEntry } from '../lib/leaderboard';
 import { tierIcon } from '../lib/points';
 import { ChallengeResults, type RoundOutcome } from './ChallengeResults';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
+import type { LeaderboardAccount } from './LeaderboardOffer';
 import { RoundFlow, type RoundResult } from './RoundFlow';
 
 interface ChallengeGameProps {
@@ -21,8 +24,9 @@ interface ChallengeGameProps {
   region?: RegionId;
   title: string;
   countries: Country[];
-  isSignedIn: boolean;
+  account: LeaderboardAccount | null;
   onLogin: () => void;
+  onViewBoard: (board: string) => void;
   onPlayAgain: () => void;
   onExit: () => void;
 }
@@ -66,8 +70,9 @@ export function ChallengeGame({
   region,
   title,
   countries,
-  isSignedIn,
+  account,
   onLogin,
+  onViewBoard,
   onPlayAgain,
   onExit,
 }: ChallengeGameProps) {
@@ -75,6 +80,7 @@ export function ChallengeGame({
   const [startedAt] = useState(() => Date.now());
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
   const [earned, setEarned] = useState<EarnedAchievement[]>([]);
+  const [entry, setEntry] = useState<BoardEntry | null>(null);
 
   const totalRounds = countries.length;
   const isTimed = kind === 'time';
@@ -100,7 +106,15 @@ export function ChallengeGame({
       rounds: all.map((r) => r.round),
       ...(isTimed ? { timeSeconds: (now - startedAt) / 1000 + penalty, penaltySeconds: penalty } : {}),
     });
-    setEarned(recordGame(game).earned);
+    const { earned: newlyEarned } = recordGame(game);
+    setEarned(newlyEarned);
+    setEntry(
+      buildEntry(
+        game,
+        newlyEarned.map((a) => a.id),
+        todayKey(),
+      ),
+    );
     setFinishedAt(now);
   }
 
@@ -153,8 +167,10 @@ export function ChallengeGame({
           subLines={subLines}
           outcomes={records}
           earned={earned}
-          isSignedIn={isSignedIn}
+          entry={entry}
+          account={account}
           onLogin={onLogin}
+          onViewBoard={onViewBoard}
           onPlayAgain={onPlayAgain}
           onExit={onExit}
         />

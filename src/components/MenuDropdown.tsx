@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 interface MenuDropdownProps {
   onPrivacyPolicy: () => void;
   onScoringGuide: () => void;
+  onLeaderboards: () => void;
   onLoginClick: () => void;
   onLogout: () => void;
   /** Signed-in user's email, or null when logged out. */
@@ -15,6 +16,7 @@ const DONATE_URL = 'https://ko-fi.com/gamesbonds';
 export function MenuDropdown({
   onPrivacyPolicy,
   onScoringGuide,
+  onLeaderboards,
   onLoginClick,
   onLogout,
   userEmail,
@@ -78,6 +80,16 @@ export function MenuDropdown({
           >
             <span>💖</span> Donate
           </a>
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onLeaderboards();
+            }}
+            className="flex w-full items-center gap-2 border-t border-slate-700/60 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+          >
+            <span>🏆</span> Leaderboards
+          </button>
           <button
             type="button"
             onClick={() => {

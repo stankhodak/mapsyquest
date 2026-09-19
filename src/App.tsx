@@ -11,7 +11,8 @@ import { AccountBadge } from './components/AccountBadge';
 import { AchievementsPanel } from './components/AchievementsPanel';
 import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
 import { FeedbackScreen } from './components/FeedbackScreen';
-import { LeaderboardOffer } from './components/LeaderboardOffer';
+import { LeaderboardOffer, type LeaderboardAccount } from './components/LeaderboardOffer';
+import { LeaderboardScreen } from './components/LeaderboardScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
@@ -25,6 +26,7 @@ import { recordGame } from './lib/achievementStore';
 import type { EarnedAchievement } from './lib/achievements';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
+import { entryFromDailyRecord, suggestedNickname } from './lib/leaderboard';
 import { buildGameSummary, fullRoundSummary } from './lib/gameSummaries';
 import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
@@ -103,11 +105,13 @@ function App() {
   // Achievements the daily game just earned. Only set in the session that finishes the
   // game — a returning player viewing an old result doesn't re-earn (or re-record) them.
   const [dailyEarned, setDailyEarned] = useState<EarnedAchievement[]>([]);
+  // Which board the leaderboard screen opens on.
+  const [leaderboardBoard, setLeaderboardBoard] = useState('daily');
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
   const [screen, setScreen] = useState<
-    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback' | 'more-challenges' | 'scoring'
+    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback' | 'more-challenges' | 'scoring' | 'leaderboard'
   >('start');
   const [session, setSession] = useState<Session | null>(null);
   // Set when the player presses Play (or dev-Resets); null once the round data itself
@@ -261,6 +265,14 @@ function App() {
       points: r.points,
       tiers: r.tiers,
     }));
+  // Built from the saved day record (not just this session's game) so a guest who logs in
+  // after finishing - which reloads the page - can still post today's score.
+  const dailyEntry = storedRecord
+    ? entryFromDailyRecord(
+        storedRecord,
+        dailyEarned.map((a) => a.id),
+      )
+    : null;
   const totalStars = storedRecord?.totalStars ?? results.reduce((sum, r) => sum + r.stars, 0);
   const totalPoints = storedRecord?.totalPoints ?? results.reduce((sum, r) => sum + r.points, 0);
 
@@ -275,6 +287,15 @@ function App() {
       'Account'
     : null;
 
+  function openLeaderboard(board: string) {
+    setLeaderboardBoard(board);
+    setScreen('leaderboard');
+  }
+
+  const account: LeaderboardAccount | null = session
+    ? { userId: session.user.id, suggestedNickname: suggestedNickname(session.user.user_metadata) }
+    : null;
+
   return (
     <div className="min-h-svh bg-slate-950 px-4 py-8 text-slate-100 md:py-4">
       {/* Same width/centering trick as MapScope's own wrapper (relative left-1/2 + w-[calc(100vw-2rem)]
@@ -284,6 +305,7 @@ function App() {
         <MenuDropdown
           onPrivacyPolicy={() => setScreen('privacy')}
           onScoringGuide={() => setScreen('scoring')}
+          onLeaderboards={() => openLeaderboard('daily')}
           onLoginClick={() => setScreen('login')}
           onLogout={handleLogout}
           userEmail={session?.user.email ?? null}
@@ -342,8 +364,17 @@ function App() {
         {screen === 'more-challenges' && (
           <ChallengesHub
             onBack={() => setScreen('start')}
-            isSignedIn={session !== null}
+            account={account}
             onLogin={() => setScreen('login')}
+            onViewBoard={openLeaderboard}
+          />
+        )}
+
+        {screen === 'leaderboard' && (
+          <LeaderboardScreen
+            initialBoard={leaderboardBoard}
+            userId={account?.userId ?? null}
+            onBack={() => setScreen('start')}
           />
         )}
 
@@ -369,7 +400,12 @@ function App() {
               {totalStars} / {playOrder.length * 3} stars &middot; {totalPoints} points
             </p>
             <AchievementsPanel earned={dailyEarned} />
-            <LeaderboardOffer isSignedIn={session !== null} onLogin={() => setScreen('login')} />
+            <LeaderboardOffer
+              entry={dailyEntry}
+              account={account}
+              onLogin={() => setScreen('login')}
+              onViewBoard={openLeaderboard}
+            />
             <ul className="grid grid-cols-[1.1rem_minmax(0,1fr)_minmax(0,1fr)_1.6rem_auto_auto] items-center gap-x-2 text-left text-xs text-slate-300">
               {summaryRows.map((r, i) => {
                 const country = getCountryById(r.countryId);
