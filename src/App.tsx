@@ -14,7 +14,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
 import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
-import { MoreChallengesScreen } from './components/MoreChallengesScreen';
+import { ChallengesHub } from './components/ChallengesHub';
 import { StartScreen } from './components/StartScreen';
 import { getCountryById } from './data/countries';
 import type { Country } from './data/types';
@@ -323,7 +323,7 @@ function App() {
           />
         )}
 
-        {screen === 'more-challenges' && <MoreChallengesScreen onBack={() => setScreen('start')} />}
+        {screen === 'more-challenges' && <ChallengesHub onBack={() => setScreen('start')} />}
 
         {screen === 'game' && !isGameOver && (
           <RoundFlow

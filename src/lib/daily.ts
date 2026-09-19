@@ -53,20 +53,25 @@ export function getDailyCountries(dateKey: string = todayKey()): Country[] {
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
 
-  // Walk the shuffled pool, skipping countries that would push either island cap
-  // over its limit — keeps the selection deterministic while keeping a single day
-  // from stacking up on hard-to-place islands.
+  return selectWithIslandCaps(pool, ROUNDS_PER_DAY);
+}
+
+/**
+ * Walks an already-shuffled pool, skipping countries that would push either island cap
+ * over its limit — keeps the selection deterministic while keeping a single game from
+ * stacking up on hard-to-place islands. Shared with the non-daily challenges.
+ */
+export function selectWithIslandCaps(shuffledPool: Country[], count: number): Country[] {
   const selected: Country[] = [];
   let islandCount = 0;
   let verySmallIslandCount = 0;
-  for (const country of pool) {
-    if (selected.length >= ROUNDS_PER_DAY) break;
+  for (const country of shuffledPool) {
+    if (selected.length >= count) break;
     if (country.isVerySmallIsland && verySmallIslandCount >= MAX_VERY_SMALL_ISLANDS_PER_DAY) continue;
     if (country.isIsland && islandCount >= MAX_ISLANDS_PER_DAY) continue;
     selected.push(country);
     if (country.isIsland) islandCount++;
     if (country.isVerySmallIsland) verySmallIslandCount++;
   }
-
   return selected;
 }

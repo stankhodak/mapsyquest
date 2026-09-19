@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
+import { flagImageUrl } from '../lib/flags';
 import { MAX_SCORE, tierForTry, tryFraction, type StarTier } from '../lib/points';
 import { normaliseCapital } from '../lib/scoring';
 import { AttemptBadge, FeedbackBadge, RoundBadge, type FeedbackTone } from './Badge';
@@ -18,6 +19,8 @@ interface CountryStepProps {
   roundNumber: number;
   totalRounds: number;
   onComplete: (result: CountryGuessResult) => void;
+  /** What the player identifies the country from: its spot on the map (default) or its flag. */
+  clue?: 'map' | 'flag';
 }
 
 const MIN_QUERY_LENGTH = 3;
@@ -31,7 +34,7 @@ interface Feedback {
   label: string;
 }
 
-export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: CountryStepProps) {
+export function CountryStep({ answer, roundNumber, totalRounds, onComplete, clue = 'map' }: CountryStepProps) {
   const [query, setQuery] = useState('');
   const [tryNumber, setTryNumber] = useState(1);
   const [flashSignal, setFlashSignal] = useState(0);
@@ -112,19 +115,32 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete }: Co
         </RoundBadge>
         <AttemptBadge current={tryNumber} max={MAX_TRIES} />
       </div>
-      <MapScope
-        center={answer.center}
-        zoom={answer.mapZoom}
-        countryId={answer.id}
-        revealOutline={onFinalTry}
-        fitToOutline={onFinalTry}
-        flashGuessId={flashGuessId}
-        flashSignal={flashSignal}
-        correctFlashSignal={correctFlashSignal}
-        cornerLabel="Guess the country"
-        introGlide
-      />
-      {onFinalTry && !feedback && (
+      {clue === 'flag' ? (
+        <div className="relative flex h-44 items-end justify-center rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+          <span className="absolute left-3 top-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Guess the country from its flag
+          </span>
+          <img
+            src={flagImageUrl(answer.id)}
+            alt="Flag to identify"
+            className="h-28 w-auto max-w-full rounded object-contain shadow-lg"
+          />
+        </div>
+      ) : (
+        <MapScope
+          center={answer.center}
+          zoom={answer.mapZoom}
+          countryId={answer.id}
+          revealOutline={onFinalTry}
+          fitToOutline={onFinalTry}
+          flashGuessId={flashGuessId}
+          flashSignal={flashSignal}
+          correctFlashSignal={correctFlashSignal}
+          cornerLabel="Guess the country"
+          introGlide
+        />
+      )}
+      {clue === 'map' && onFinalTry && !feedback && (
         <p className="text-xs text-slate-400">Last try — outline revealed on the map</p>
       )}
       {/* Desktop: the feedback badge floats in a slot to the left of the input via
