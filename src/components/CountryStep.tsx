@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
-import { MAX_SCORE, tierForTry, tryFraction, type StarTier } from '../lib/points';
+import { MAX_SCORE, tierForTry, TRIES_PER_CATEGORY, tryFraction, type StarTier } from '../lib/points';
 import { normaliseCapital } from '../lib/scoring';
 import { AttemptBadge, FeedbackBadge, RoundBadge, type FeedbackTone } from './Badge';
 import { MapScope } from './MapScope';
@@ -25,7 +25,7 @@ interface CountryStepProps {
 
 const MIN_QUERY_LENGTH = 3;
 const MAX_SUGGESTIONS = 8;
-const MAX_TRIES = 3;
+const MAX_TRIES = TRIES_PER_CATEGORY.country;
 /** How long the feedback badge (and MapScope's matching flash) shows before advancing. */
 const FEEDBACK_DELAY_MS = 900;
 

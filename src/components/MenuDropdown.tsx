@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 interface MenuDropdownProps {
   onPrivacyPolicy: () => void;
+  onScoringGuide: () => void;
   onLoginClick: () => void;
   onLogout: () => void;
   /** Signed-in user's email, or null when logged out. */
@@ -11,7 +12,13 @@ interface MenuDropdownProps {
 const DONATE_URL = 'https://ko-fi.com/gamesbonds';
 
 /** Bubble menu to the left of the title. */
-export function MenuDropdown({ onPrivacyPolicy, onLoginClick, onLogout, userEmail }: MenuDropdownProps) {
+export function MenuDropdown({
+  onPrivacyPolicy,
+  onScoringGuide,
+  onLoginClick,
+  onLogout,
+  userEmail,
+}: MenuDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +78,16 @@ export function MenuDropdown({ onPrivacyPolicy, onLoginClick, onLogout, userEmai
           >
             <span>💖</span> Donate
           </a>
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onScoringGuide();
+            }}
+            className="flex w-full items-center gap-2 border-t border-slate-700/60 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+          >
+            <span>📖</span> How scoring works
+          </button>
           <button
             type="button"
             onClick={() => {

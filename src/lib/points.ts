@@ -10,6 +10,13 @@ export const MAX_SCORE = {
 
 export type ScoringCategory = keyof typeof MAX_SCORE;
 
+/** How many guesses each step allows (country: type it; capital: pick from options; flag: pick from options). */
+export const TRIES_PER_CATEGORY = {
+  country: 3,
+  capital: 2,
+  flag: 1,
+} as const;
+
 /** Fraction of max score awarded per try (1st/2nd/3rd): flat -30 percentage points per try. */
 const TRY_FRACTIONS = [1, 0.7, 0.4] as const;
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
-import { MAX_SCORE, tierForTry, tryFraction, type StarTier } from '../lib/points';
+import { MAX_SCORE, tierForTry, TRIES_PER_CATEGORY, tryFraction, type StarTier } from '../lib/points';
 import { AttemptBadge, RoundBadge } from './Badge';
 import { MapScope } from './MapScope';
 
@@ -19,7 +19,7 @@ interface CapitalStepProps {
   onComplete: (result: CapitalGuessResult) => void;
 }
 
-const MAX_TRIES = 2;
+const MAX_TRIES = TRIES_PER_CATEGORY.capital;
 const OPTION_COUNT = 16;
 const REVEAL_DELAY_MS = 900;
 /** Tighter than the country step's hint margin, so the country fills most of the frame. */

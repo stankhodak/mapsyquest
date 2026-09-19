@@ -14,6 +14,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
 import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
+import { ScoringGuideScreen } from './components/ScoringGuideScreen';
 import { ChallengesHub } from './components/ChallengesHub';
 import { StartScreen } from './components/StartScreen';
 import { getCountryById } from './data/countries';
@@ -98,7 +99,7 @@ function App() {
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
   const [screen, setScreen] = useState<
-    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback' | 'more-challenges'
+    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback' | 'more-challenges' | 'scoring'
   >('start');
   const [session, setSession] = useState<Session | null>(null);
   // Set when the player presses Play (or dev-Resets); null once the round data itself
@@ -270,6 +271,7 @@ function App() {
       <header className="relative left-1/2 z-20 mb-8 grid w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-start md:mb-3">
         <MenuDropdown
           onPrivacyPolicy={() => setScreen('privacy')}
+          onScoringGuide={() => setScreen('scoring')}
           onLoginClick={() => setScreen('login')}
           onLogout={handleLogout}
           userEmail={session?.user.email ?? null}
@@ -287,6 +289,8 @@ function App() {
 
       <main>
         {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
+
+        {screen === 'scoring' && <ScoringGuideScreen onBack={() => setScreen('start')} />}
 
         {screen === 'feedback' && (
           <FeedbackScreen

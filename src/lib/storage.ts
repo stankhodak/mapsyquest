@@ -35,7 +35,7 @@ export interface StreakState {
 
 const EMPTY_STREAK: StreakState = { currentStreak: 0, maxStreak: 0, lastCompletedDate: null };
 
-function safeGetItem(key: string): string | null {
+export function safeGetItem(key: string): string | null {
   try {
     return window.localStorage.getItem(key);
   } catch {
@@ -43,7 +43,7 @@ function safeGetItem(key: string): string | null {
   }
 }
 
-function safeSetItem(key: string, value: string): void {
+export function safeSetItem(key: string, value: string): void {
   try {
     window.localStorage.setItem(key, value);
   } catch {
