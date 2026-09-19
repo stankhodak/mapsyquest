@@ -15,6 +15,8 @@ import { ChallengeGame } from './ChallengeGame';
 interface ChallengesHubProps {
   /** Back to the main start screen. */
   onBack: () => void;
+  isSignedIn: boolean;
+  onLogin: () => void;
 }
 
 type HubView = { name: 'menu' } | { name: 'regions' } | { name: 'regional-format'; region: RegionId };
@@ -62,7 +64,7 @@ function BackLink({ onClick, children }: { onClick: () => void; children: ReactN
   );
 }
 
-export function ChallengesHub({ onBack }: ChallengesHubProps) {
+export function ChallengesHub({ onBack, isSignedIn, onLogin }: ChallengesHubProps) {
   const [view, setView] = useState<HubView>({ name: 'menu' });
   const [game, setGame] = useState<ActiveGame | null>(null);
 
@@ -75,6 +77,9 @@ export function ChallengesHub({ onBack }: ChallengesHubProps) {
       <ChallengeGame
         key={game.gameId}
         kind={game.setup.kind}
+        region={game.setup.region}
+        isSignedIn={isSignedIn}
+        onLogin={onLogin}
         title={challengeTitle(game.setup)}
         countries={game.countries}
         onPlayAgain={() => startGame(game.setup, game.gameId)}

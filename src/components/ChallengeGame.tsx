@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { Country } from '../data/types';
+import { recordGame } from '../lib/achievementStore';
+import type { EarnedAchievement, RoundSummary } from '../lib/achievements';
 import {
   formatChallengeTime,
   TIME_PENALTY_SECONDS,
   wrongGuessesForTier,
   type ChallengeKind,
+  type RegionId,
 } from '../lib/challenges';
+import { buildGameSummary, countryRoundSummary, fullRoundSummary } from '../lib/gameSummaries';
 import { tierIcon } from '../lib/points';
 import { ChallengeResults, type RoundOutcome } from './ChallengeResults';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
@@ -13,15 +17,18 @@ import { RoundFlow, type RoundResult } from './RoundFlow';
 
 interface ChallengeGameProps {
   kind: ChallengeKind;
+  /** Set for the two regional kinds. */
+  region?: RegionId;
   title: string;
   countries: Country[];
+  isSignedIn: boolean;
+  onLogin: () => void;
   onPlayAgain: () => void;
   onExit: () => void;
 }
 
 interface OutcomeRecord extends RoundOutcome {
-  points: number;
-  stars: number;
+  round: RoundSummary;
   wrongGuesses: number;
 }
 
@@ -54,19 +61,47 @@ function Stopwatch({
   );
 }
 
-export function ChallengeGame({ kind, title, countries, onPlayAgain, onExit }: ChallengeGameProps) {
+export function ChallengeGame({
+  kind,
+  region,
+  title,
+  countries,
+  isSignedIn,
+  onLogin,
+  onPlayAgain,
+  onExit,
+}: ChallengeGameProps) {
   const [records, setRecords] = useState<OutcomeRecord[]>([]);
   const [startedAt] = useState(() => Date.now());
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const [earned, setEarned] = useState<EarnedAchievement[]>([]);
 
   const totalRounds = countries.length;
   const isTimed = kind === 'time';
-  const penaltySeconds = records.reduce((sum, r) => sum + r.wrongGuesses, 0) * TIME_PENALTY_SECONDS;
+  const penaltyOf = (rs: OutcomeRecord[]) => rs.reduce((sum, r) => sum + r.wrongGuesses, 0) * TIME_PENALTY_SECONDS;
+  const penaltySeconds = penaltyOf(records);
 
   function record(outcome: OutcomeRecord) {
     const next = [...records, outcome];
     setRecords(next);
-    if (next.length === totalRounds) setFinishedAt(Date.now());
+    if (next.length === totalRounds) finishGame(next);
+  }
+
+  /**
+   * Runs from the event handler that records the last round (not an effect) so the
+   * achievement profile is updated exactly once — effects run twice under StrictMode.
+   */
+  function finishGame(all: OutcomeRecord[]) {
+    const now = Date.now();
+    const penalty = penaltyOf(all);
+    const game = buildGameSummary({
+      kind,
+      region,
+      rounds: all.map((r) => r.round),
+      ...(isTimed ? { timeSeconds: (now - startedAt) / 1000 + penalty, penaltySeconds: penalty } : {}),
+    });
+    setEarned(recordGame(game).earned);
+    setFinishedAt(now);
   }
 
   function handleGuess(country: Country, result: CountryGuessResult) {
@@ -75,8 +110,7 @@ export function ChallengeGame({ kind, title, countries, onPlayAgain, onExit }: C
       country,
       icons: tierIcon(result.tier),
       detail: isTimed ? (wrongGuesses > 0 ? `+${wrongGuesses * TIME_PENALTY_SECONDS}s` : '—') : `${result.score} pts`,
-      points: result.score,
-      stars: result.tier ? 1 : 0,
+      round: countryRoundSummary(country, result),
       wrongGuesses,
     });
   }
@@ -86,15 +120,14 @@ export function ChallengeGame({ kind, title, countries, onPlayAgain, onExit }: C
       country,
       icons: `${tierIcon(result.tiers.country)}${tierIcon(result.tiers.capital)}${tierIcon(result.tiers.flag)}`,
       detail: `${result.points} pts`,
-      points: result.points,
-      stars: result.stars,
+      round: fullRoundSummary(result),
       wrongGuesses: 0,
     });
   }
 
   if (records.length >= totalRounds && finishedAt !== null) {
-    const totalPoints = records.reduce((sum, r) => sum + r.points, 0);
-    const totalStars = records.reduce((sum, r) => sum + r.stars, 0);
+    const totalPoints = records.reduce((sum, r) => sum + r.round.points, 0);
+    const totalStars = records.reduce((sum, r) => sum + r.round.stars, 0);
     const rawSeconds = (finishedAt - startedAt) / 1000;
 
     let headline: string;
@@ -119,6 +152,9 @@ export function ChallengeGame({ kind, title, countries, onPlayAgain, onExit }: C
           headline={headline}
           subLines={subLines}
           outcomes={records}
+          earned={earned}
+          isSignedIn={isSignedIn}
+          onLogin={onLogin}
           onPlayAgain={onPlayAgain}
           onExit={onExit}
         />

@@ -1,5 +1,8 @@
 import type { Country } from '../data/types';
+import type { EarnedAchievement } from '../lib/achievements';
 import { flagImageUrl } from '../lib/flags';
+import { AchievementsPanel } from './AchievementsPanel';
+import { LeaderboardOffer } from './LeaderboardOffer';
 
 export interface RoundOutcome {
   country: Country;
@@ -16,11 +19,24 @@ interface ChallengeResultsProps {
   /** Smaller lines under the headline. */
   subLines: string[];
   outcomes: RoundOutcome[];
+  earned: EarnedAchievement[];
+  isSignedIn: boolean;
+  onLogin: () => void;
   onPlayAgain: () => void;
   onExit: () => void;
 }
 
-export function ChallengeResults({ title, headline, subLines, outcomes, onPlayAgain, onExit }: ChallengeResultsProps) {
+export function ChallengeResults({
+  title,
+  headline,
+  subLines,
+  outcomes,
+  earned,
+  isSignedIn,
+  onLogin,
+  onPlayAgain,
+  onExit,
+}: ChallengeResultsProps) {
   return (
     <div className="space-y-5">
       <div className="space-y-1 text-center">
@@ -32,6 +48,9 @@ export function ChallengeResults({ title, headline, subLines, outcomes, onPlayAg
           </p>
         ))}
       </div>
+
+      <AchievementsPanel earned={earned} />
+      <LeaderboardOffer isSignedIn={isSignedIn} onLogin={onLogin} />
 
       <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900/60">
         {outcomes.map((outcome) => (

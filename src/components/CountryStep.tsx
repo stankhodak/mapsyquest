@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { countries } from '../data/countries';
 import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
+import { SKIPPED_GUESS } from '../lib/gameSummaries';
 import { MAX_SCORE, tierForTry, TRIES_PER_CATEGORY, tryFraction, type StarTier } from '../lib/points';
 import { normaliseCapital } from '../lib/scoring';
 import { AttemptBadge, FeedbackBadge, RoundBadge, type FeedbackTone } from './Badge';
@@ -102,7 +103,7 @@ export function CountryStep({ answer, roundNumber, totalRounds, onComplete, clue
 
   function skip() {
     if (locked) return;
-    onComplete({ guess: '(skipped)', isCorrect: false, score: 0, tier: null });
+    onComplete({ guess: SKIPPED_GUESS, isCorrect: false, score: 0, tier: null });
   }
 
   const onFinalTry = tryNumber >= MAX_TRIES;

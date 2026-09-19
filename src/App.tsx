@@ -8,8 +8,10 @@ import {
   trackRoundCompleted,
 } from './lib/analytics';
 import { AccountBadge } from './components/AccountBadge';
+import { AchievementsPanel } from './components/AchievementsPanel';
 import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
 import { FeedbackScreen } from './components/FeedbackScreen';
+import { LeaderboardOffer } from './components/LeaderboardOffer';
 import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
@@ -19,8 +21,11 @@ import { ChallengesHub } from './components/ChallengesHub';
 import { StartScreen } from './components/StartScreen';
 import { getCountryById } from './data/countries';
 import type { Country } from './data/types';
+import { recordGame } from './lib/achievementStore';
+import type { EarnedAchievement } from './lib/achievements';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
+import { buildGameSummary, fullRoundSummary } from './lib/gameSummaries';
 import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
 import {
@@ -95,6 +100,9 @@ function App() {
   // together (rename `_setResetCount` -> `setResetCount` here, uncomment handleReset).
   const [resetCount, _setResetCount] = useState(0);
   const [showCopiedNotice, setShowCopiedNotice] = useState(false);
+  // Achievements the daily game just earned. Only set in the session that finishes the
+  // game — a returning player viewing an old result doesn't re-earn (or re-record) them.
+  const [dailyEarned, setDailyEarned] = useState<EarnedAchievement[]>([]);
   // Every visit lands on the start screen first — including a returning player who
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
@@ -191,6 +199,10 @@ function App() {
       const newStreak = saveDailyCompletion(record);
       setStreak(newStreak);
       setStoredRecord(record);
+      setDailyEarned(
+        recordGame(buildGameSummary({ kind: 'daily', rounds: next.map(fullRoundSummary) }), newStreak.currentStreak)
+          .earned,
+      );
       trackGameCompleted(record.totalStars, record.totalPoints, playOrder.length);
       if (gameStartedAt !== null) {
         trackGameDuration(Math.round((Date.now() - gameStartedAt) / 1000));
@@ -327,7 +339,13 @@ function App() {
           />
         )}
 
-        {screen === 'more-challenges' && <ChallengesHub onBack={() => setScreen('start')} />}
+        {screen === 'more-challenges' && (
+          <ChallengesHub
+            onBack={() => setScreen('start')}
+            isSignedIn={session !== null}
+            onLogin={() => setScreen('login')}
+          />
+        )}
 
         {screen === 'game' && !isGameOver && (
           <RoundFlow
@@ -350,6 +368,8 @@ function App() {
             <p className="text-lg">
               {totalStars} / {playOrder.length * 3} stars &middot; {totalPoints} points
             </p>
+            <AchievementsPanel earned={dailyEarned} />
+            <LeaderboardOffer isSignedIn={session !== null} onLogin={() => setScreen('login')} />
             <ul className="grid grid-cols-[1.1rem_minmax(0,1fr)_minmax(0,1fr)_1.6rem_auto_auto] items-center gap-x-2 text-left text-xs text-slate-300">
               {summaryRows.map((r, i) => {
                 const country = getCountryById(r.countryId);
