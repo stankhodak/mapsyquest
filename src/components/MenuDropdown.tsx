@@ -71,15 +71,6 @@ export function MenuDropdown({
           >
             <span>🔑</span> {userEmail ? 'Log out' : 'Login'}
           </button>
-          <a
-            href={DONATE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setIsOpen(false)}
-            className="flex w-full items-center gap-2 border-t border-slate-700/60 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
-          >
-            <span>💖</span> Donate
-          </a>
           <button
             type="button"
             onClick={() => {
@@ -110,6 +101,15 @@ export function MenuDropdown({
           >
             <span>📄</span> Privacy Policy
           </button>
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsOpen(false)}
+            className="flex w-full items-center gap-2 border-t border-slate-700/60 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+          >
+            <span>💖</span> Donate
+          </a>
         </div>
       )}
     </div>
