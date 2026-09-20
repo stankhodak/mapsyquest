@@ -108,7 +108,7 @@ export function StartScreen({
       <button
         type="button"
         onClick={onMoreChallenges}
-        className="w-full rounded-xl border border-slate-700 bg-slate-900/60 px-6 py-3 text-lg font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-800 active:scale-[0.98]"
+        className="w-full rounded-xl bg-gradient-to-r from-sky-500/40 via-emerald-500/40 to-amber-400/40 px-6 py-3 text-lg font-bold text-slate-100 shadow-lg ring-1 ring-inset ring-white/10 transition hover:scale-[1.02] hover:from-sky-500/60 hover:via-emerald-500/60 hover:to-amber-400/60 hover:shadow-emerald-500/20 active:scale-[0.98]"
       >
         More Challenges
       </button>
