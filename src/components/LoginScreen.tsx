@@ -3,6 +3,8 @@ import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
 interface LoginScreenProps {
   onBack: () => void;
+  /** Called after a successful email sign-in. */
+  onLoggedIn: () => void;
 }
 
 type Mode = 'sign-in' | 'sign-up';
@@ -11,7 +13,7 @@ const PASSWORD_HINT = 'At least 8 characters, with an uppercase letter, a lowerc
 // No special-character requirement by design — see PASSWORD_HINT above.
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
-export function LoginScreen({ onBack }: LoginScreenProps) {
+export function LoginScreen({ onBack, onLoggedIn }: LoginScreenProps) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
@@ -79,7 +81,7 @@ export function LoginScreen({ onBack }: LoginScreenProps) {
     if (mode === 'sign-up') {
       setInfo('Check your email to confirm your account.');
     } else {
-      onBack();
+      onLoggedIn();
     }
   }
 

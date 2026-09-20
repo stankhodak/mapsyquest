@@ -5,6 +5,7 @@
 import { bestKey, bestValue, type GameSummary } from './achievements';
 import { CHALLENGE_ROUNDS, formatChallengeTime, REGIONS } from './challenges';
 import { MAX_SCORE, starMultiplier } from './points';
+import { safeGetItem, safeSetItem } from './storage';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 
 const TABLE = 'mapsyquest_leaderboard';
@@ -107,6 +108,59 @@ export function entryFromDailyRecord(
     stars: record.totalStars,
     achievementIds,
   };
+}
+
+// --- Pending entry: a guest's score, kept across the login ------------------------------
+
+const PENDING_KEY = 'mapsyquest:pending-entry';
+/** Long enough to confirm a sign-up email, short enough that a forgotten score doesn't resurface days later. */
+const PENDING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Remembers the score a guest was offered, so it survives the login (Google reloads the
+ * page, and any login leaves the results screen) and can be posted once they're in.
+ */
+export function savePendingEntry(entry: BoardEntry, now = Date.now()): void {
+  safeSetItem(PENDING_KEY, JSON.stringify({ entry, savedAt: now }));
+}
+
+export function clearPendingEntry(): void {
+  try {
+    window.localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // Ignore — private browsing, blocked storage, etc.
+  }
+}
+
+function isBoardEntry(value: unknown): value is BoardEntry {
+  if (typeof value !== 'object' || value === null) return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.board === 'string' &&
+    BOARDS.some((b) => b.id === e.board) &&
+    typeof e.period === 'string' &&
+    typeof e.score === 'number' &&
+    Number.isFinite(e.score) &&
+    typeof e.stars === 'number' &&
+    Number.isFinite(e.stars) &&
+    Array.isArray(e.achievementIds) &&
+    e.achievementIds.every((id) => typeof id === 'string')
+  );
+}
+
+/** The saved entry, or null if there is none, it's unreadable, too old, or a past day's daily score. */
+export function loadPendingEntry(dateKey: string, now = Date.now()): BoardEntry | null {
+  const raw = safeGetItem(PENDING_KEY);
+  if (!raw) return null;
+  try {
+    const saved = JSON.parse(raw) as { entry?: unknown; savedAt?: unknown } | null;
+    if (!saved || typeof saved.savedAt !== 'number' || now - saved.savedAt > PENDING_MAX_AGE_MS) return null;
+    if (!isBoardEntry(saved.entry)) return null;
+    if (saved.entry.board === 'daily' && saved.entry.period !== dateKey) return null;
+    return saved.entry;
+  } catch {
+    return null;
+  }
 }
 
 /** True if `score` should sit above `other` on the given board. */

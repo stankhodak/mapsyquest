@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BoardEntry } from '../../lib/leaderboard';
+import { loadPendingEntry, type BoardEntry } from '../../lib/leaderboard';
 import type { LeaderboardAccount } from '../LeaderboardOffer';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -88,6 +88,14 @@ describe('LeaderboardOffer', () => {
     expect(container.textContent).toContain('Log in to post scores');
     await click('Log in');
     expect(onLogin).toHaveBeenCalledOnce();
+  });
+
+  it("remembers a guest's score when they go to log in, so it can be posted afterwards", async () => {
+    window.localStorage.clear();
+    await render({ account: null });
+    expect(loadPendingEntry(entry.period)).toBeNull();
+    await click('Log in');
+    expect(loadPendingEntry(entry.period)).toEqual(entry);
   });
 
   it('offers a signed-in player the post form with the score and a prefilled nickname', async () => {

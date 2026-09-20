@@ -26,7 +26,13 @@ import { recordGame } from './lib/achievementStore';
 import type { EarnedAchievement } from './lib/achievements';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
-import { entryFromDailyRecord, suggestedNickname } from './lib/leaderboard';
+import {
+  clearPendingEntry,
+  entryFromDailyRecord,
+  loadPendingEntry,
+  suggestedNickname,
+  type BoardEntry,
+} from './lib/leaderboard';
 import { buildGameSummary, fullRoundSummary } from './lib/gameSummaries';
 import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
@@ -111,9 +117,20 @@ function App() {
   // already finished today, who sees the locked/countdown state there rather than
   // being dropped straight into their old results.
   const [screen, setScreen] = useState<
-    'start' | 'game' | 'privacy' | 'login' | 'choose-nickname' | 'feedback' | 'more-challenges' | 'scoring' | 'leaderboard'
+    | 'start'
+    | 'game'
+    | 'privacy'
+    | 'login'
+    | 'choose-nickname'
+    | 'feedback'
+    | 'more-challenges'
+    | 'scoring'
+    | 'leaderboard'
+    | 'post-pending'
   >('start');
   const [session, setSession] = useState<Session | null>(null);
+  // The score a guest was offered before logging in, shown again once they're signed in.
+  const [pendingEntry, setPendingEntry] = useState<BoardEntry | null>(null);
   // Set when the player presses Play (or dev-Resets); null once the round data itself
   // (results/roundIndex) has been cleared without a fresh play, so the game_abandoned
   // check below can tell "actively mid-game" apart from "sitting on the start screen".
@@ -138,16 +155,33 @@ function App() {
     return () => window.removeEventListener('pagehide', handlePageHide);
   }, [gameStartedAt, roundIndex, playOrder.length]);
 
+  // Shows the score a guest was offered before logging in, now that they're signed in.
+  // Cleared as it's shown, so it's offered once and never nags on later visits.
+  function offerPendingEntry(): boolean {
+    const pending = loadPendingEntry(todayKey());
+    if (!pending) return false;
+    clearPendingEntry();
+    setPendingEntry(pending);
+    setScreen('post-pending');
+    return true;
+  }
+
+  function finishLogin() {
+    if (!offerPendingEntry()) setScreen('start');
+  }
+
   // Google sign-in never goes through LoginScreen's own nickname field (it redirects
   // straight to Google), so this is how those players get offered one — once, the
   // first time, tracked via user_metadata.nicknamePrompted rather than re-asking on
   // every login.
-  function maybePromptNickname(newSession: Session | null) {
+  function maybePromptNickname(newSession: Session | null): boolean {
     const metadata = newSession?.user.user_metadata;
     const isGoogleAccount = newSession?.user.app_metadata.provider === 'google';
     if (isGoogleAccount && !metadata?.nickname && !metadata?.nicknamePrompted) {
       setScreen('choose-nickname');
+      return true;
     }
+    return false;
   }
 
   // Picks up the session Supabase restores from storage on load, and the one it sets
@@ -156,7 +190,8 @@ function App() {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      maybePromptNickname(data.session);
+      // A player arriving from a Google redirect or a confirmation email, having logged in to post a score.
+      if (data.session && !maybePromptNickname(data.session)) offerPendingEntry();
     });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
@@ -334,7 +369,7 @@ function App() {
           />
         )}
 
-        {screen === 'login' && <LoginScreen onBack={() => setScreen('start')} />}
+        {screen === 'login' && <LoginScreen onBack={() => setScreen('start')} onLoggedIn={finishLogin} />}
 
         {screen === 'choose-nickname' && session && (
           <ChooseNicknameScreen
@@ -344,7 +379,7 @@ function App() {
               session.user.email ||
               'there'
             }
-            onDone={() => setScreen('start')}
+            onDone={finishLogin}
           />
         )}
 
@@ -368,6 +403,26 @@ function App() {
             onLogin={() => setScreen('login')}
             onViewBoard={openLeaderboard}
           />
+        )}
+
+        {screen === 'post-pending' && pendingEntry && (
+          <div className="mx-auto w-full max-w-md space-y-4 text-center">
+            <h2 className="text-xl font-bold text-slate-100">You're logged in</h2>
+            <p className="text-sm text-slate-400">Here's the score you finished before logging in.</p>
+            <LeaderboardOffer
+              entry={pendingEntry}
+              account={account}
+              onLogin={() => setScreen('login')}
+              onViewBoard={openLeaderboard}
+            />
+            <button
+              type="button"
+              onClick={() => setScreen('start')}
+              className="text-sm text-slate-400 underline hover:text-slate-200"
+            >
+              Return to main screen
+            </button>
+          </div>
         )}
 
         {screen === 'leaderboard' && (

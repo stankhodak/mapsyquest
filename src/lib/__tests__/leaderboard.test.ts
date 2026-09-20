@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import leaderboardSql from '../../../supabase/leaderboard.sql?raw';
 import type { GameSummary, RoundSummary } from '../achievements';
+import type { BoardEntry } from '../leaderboard';
 
 /**
  * A tiny stand-in for the Supabase query builder: every method returns the builder, and
@@ -39,8 +40,11 @@ const {
   isLowerBetter,
   MAX_DAILY_POINTS,
   MAX_QUIZ_POINTS,
+  clearPendingEntry,
+  loadPendingEntry,
   ranksAbove,
   saveNickname,
+  savePendingEntry,
   submitScore,
   suggestedNickname,
 } = await import('../leaderboard');
@@ -252,6 +256,59 @@ describe('saveNickname', () => {
   it('stores the trimmed nickname on the account', async () => {
     await saveNickname('  Mapsy ');
     expect(updateUser).toHaveBeenCalledWith({ data: { nickname: 'Mapsy' } });
+  });
+});
+
+describe('pending entry (a guest logging in to post)', () => {
+  const HOUR = 3_600_000;
+  const NOW = Date.UTC(2026, 8, 20, 12);
+  const daily: BoardEntry = { board: 'daily', period: '2026-09-20', score: 6100, stars: 18, achievementIds: ['big-score'] };
+  const time: BoardEntry = { board: 'time', period: 'all', score: 153.2, stars: 0, achievementIds: [] };
+
+  beforeEach(() => window.localStorage.clear());
+
+  it('returns nothing when no entry was saved', () => {
+    expect(loadPendingEntry('2026-09-20', NOW)).toBeNull();
+  });
+
+  it('returns the saved entry, surviving a reload', () => {
+    savePendingEntry(time, NOW);
+    expect(loadPendingEntry('2026-09-20', NOW + HOUR)).toEqual(time);
+  });
+
+  it('keeps only the latest entry', () => {
+    savePendingEntry(time, NOW);
+    savePendingEntry(daily, NOW);
+    expect(loadPendingEntry('2026-09-20', NOW)).toEqual(daily);
+  });
+
+  it('clears the entry', () => {
+    savePendingEntry(time, NOW);
+    clearPendingEntry();
+    expect(loadPendingEntry('2026-09-20', NOW)).toBeNull();
+  });
+
+  it('drops an entry older than a day', () => {
+    savePendingEntry(time, NOW);
+    expect(loadPendingEntry('2026-09-20', NOW + 24 * HOUR - 1)).toEqual(time);
+    expect(loadPendingEntry('2026-09-20', NOW + 24 * HOUR + 1)).toBeNull();
+  });
+
+  it("drops a daily entry from a previous day, since that day's board is no longer shown", () => {
+    savePendingEntry(daily, NOW);
+    expect(loadPendingEntry('2026-09-21', NOW + HOUR)).toBeNull();
+  });
+
+  it('ignores garbage in storage', () => {
+    for (const raw of ['not json', '{}', 'null', JSON.stringify({ entry: { board: 'nope' }, savedAt: NOW })]) {
+      window.localStorage.setItem('mapsyquest:pending-entry', raw);
+      expect(loadPendingEntry('2026-09-20', NOW)).toBeNull();
+    }
+    window.localStorage.setItem(
+      'mapsyquest:pending-entry',
+      JSON.stringify({ entry: { ...time, score: 'fast' }, savedAt: NOW }),
+    );
+    expect(loadPendingEntry('2026-09-20', NOW)).toBeNull();
   });
 });
 

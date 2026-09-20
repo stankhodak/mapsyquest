@@ -5,6 +5,7 @@ import {
   isLeaderboardAvailable,
   MAX_NICKNAME_LENGTH,
   saveNickname,
+  savePendingEntry,
   submitScore,
   type BoardEntry,
   type SubmitOutcome,
@@ -45,7 +46,11 @@ export function LeaderboardOffer({ entry, account, onLogin, onViewBoard }: Leade
         <p className="text-xs text-slate-400">Log in to post scores and see how you rank.</p>
         <button
           type="button"
-          onClick={onLogin}
+          onClick={() => {
+            // Logging in leaves this screen (Google even reloads the page), so keep the score to offer afterwards.
+            savePendingEntry(entry);
+            onLogin();
+          }}
           className="rounded-lg border border-sky-500/60 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/20"
         >
           Log in
