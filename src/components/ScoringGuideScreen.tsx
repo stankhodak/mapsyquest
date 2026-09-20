@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ACHIEVEMENTS, type AchievementDef } from '../lib/achievements';
-import { CHALLENGE_ROUNDS, TIME_PENALTY_SECONDS, wrongGuessesForTier } from '../lib/challenges';
+import { CHALLENGE_ROUNDS, TIME_PENALTY_SECONDS, timePenaltySeconds, wrongGuessesForTier } from '../lib/challenges';
 import {
   MAX_SCORE,
   starMultiplier,
@@ -163,14 +163,14 @@ export function ScoringGuideScreen({ onBack }: ScoringGuideScreenProps) {
       <Section title="Time Challenge">
         <p>
           No points here, just your time. The clock runs from the first country to the last, and every wrong guess
-          adds {TIME_PENALTY_SECONDS} seconds:
+          adds a {TIME_PENALTY_SECONDS} sec penalty:
         </p>
         <div>
           {(['gold', 'silver', 'bronze', null] as const).map((tier) => {
             const wrong = wrongGuessesForTier(tier);
             return (
               <Row key={String(tier)} label={`${tierIcon(tier)} ${tier === null ? 'Missed or skipped' : `Right on try ${tier === 'gold' ? 1 : tier === 'silver' ? 2 : 3}`}`}>
-                {wrong === 0 ? 'no penalty' : `+${wrong * TIME_PENALTY_SECONDS}s`}
+                {wrong === 0 ? 'no penalty' : `+${timePenaltySeconds(wrong)}s`}
               </Row>
             );
           })}

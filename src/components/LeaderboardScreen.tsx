@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { todayKey } from '../lib/daily';
 import {
   BOARDS,
@@ -29,12 +29,14 @@ function BoardCard({
   result,
   userId,
   highlighted,
+  onRetry,
 }: {
   board: string;
   /** Undefined while the board is still loading. */
   result: LeaderboardResult<LeaderboardRow[]> | undefined;
   userId: string | null;
   highlighted: boolean;
+  onRetry: () => void;
 }) {
   return (
     <section
@@ -46,9 +48,16 @@ function BoardCard({
       {result === undefined && <p className="py-2 text-slate-400">Loading…</p>}
 
       {result && !result.ok && (
-        <p role="alert" className="py-2 text-rose-300">
-          Couldn't load this board right now.
-        </p>
+        <div role="alert" className="flex items-center justify-between gap-3 py-2 text-rose-300">
+          <span>Couldn't load this board right now.</span>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="shrink-0 rounded-lg border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       {result?.ok && result.value.length === 0 && <p className="py-2 text-slate-400">No scores yet. Be the first!</p>}
@@ -77,19 +86,27 @@ function BoardCard({
 export function LeaderboardScreen({ initialBoard, userId, onBack }: LeaderboardScreenProps) {
   // Filled in per board as each fetch finishes, so one slow or failing board doesn't hold up the rest.
   const [results, setResults] = useState<BoardResults>({});
+  const mounted = useRef(false);
+
+  function loadBoard(id: string) {
+    fetchTopScores(id, boardPeriod(id, todayKey()), TOP_SHOWN).then((result) => {
+      if (!result.ok) console.warn(`Couldn't load the ${id} leaderboard:`, result.error);
+      if (mounted.current) setResults((prev) => ({ ...prev, [id]: result }));
+    });
+  }
+
+  function retryBoard(id: string) {
+    setResults(({ [id]: _failed, ...rest }) => rest);
+    loadBoard(id);
+  }
 
   useEffect(() => {
-    if (!isLeaderboardAvailable) return;
-    let cancelled = false;
-    const today = todayKey();
-    for (const { id } of BOARDS) {
-      fetchTopScores(id, boardPeriod(id, today), TOP_SHOWN).then((result) => {
-        if (!cancelled) setResults((prev) => ({ ...prev, [id]: result }));
-      });
-    }
+    mounted.current = true;
+    if (isLeaderboardAvailable) BOARDS.forEach(({ id }) => loadBoard(id));
     return () => {
-      cancelled = true;
+      mounted.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -112,6 +129,7 @@ export function LeaderboardScreen({ initialBoard, userId, onBack }: LeaderboardS
               result={results[b.id]}
               userId={userId}
               highlighted={b.id === initialBoard}
+              onRetry={() => retryBoard(b.id)}
             />
           ))}
         </div>

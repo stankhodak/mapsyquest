@@ -4,7 +4,7 @@ import { recordGame } from '../lib/achievementStore';
 import type { EarnedAchievement, RoundSummary } from '../lib/achievements';
 import {
   formatChallengeTime,
-  TIME_PENALTY_SECONDS,
+  timePenaltySeconds,
   wrongGuessesForTier,
   type ChallengeKind,
   type RegionId,
@@ -84,12 +84,15 @@ export function ChallengeGame({
 
   const totalRounds = countries.length;
   const isTimed = kind === 'time';
-  const penaltyOf = (rs: OutcomeRecord[]) => rs.reduce((sum, r) => sum + r.wrongGuesses, 0) * TIME_PENALTY_SECONDS;
+  const penaltyOf = (rs: OutcomeRecord[]) => timePenaltySeconds(rs.reduce((sum, r) => sum + r.wrongGuesses, 0));
   const penaltySeconds = penaltyOf(records);
+  // Wrong guesses on the country being played, charged on the clock straight away instead of when it ends.
+  const [liveWrongGuesses, setLiveWrongGuesses] = useState(0);
 
   function record(outcome: OutcomeRecord) {
     const next = [...records, outcome];
     setRecords(next);
+    setLiveWrongGuesses(0);
     if (next.length === totalRounds) finishGame(next);
   }
 
@@ -123,7 +126,7 @@ export function ChallengeGame({
     record({
       country,
       icons: tierIcon(result.tier),
-      detail: isTimed ? (wrongGuesses > 0 ? `+${wrongGuesses * TIME_PENALTY_SECONDS}s` : '—') : `${result.score} pts`,
+      detail: isTimed ? (wrongGuesses > 0 ? `+${timePenaltySeconds(wrongGuesses)}s` : '—') : `${result.score} pts`,
       round: countryRoundSummary(country, result),
       wrongGuesses,
     });
@@ -191,7 +194,13 @@ export function ChallengeGame({
         <span className="min-w-0 truncate text-sm font-semibold text-slate-300">{title}</span>
       </div>
 
-      {isTimed && <Stopwatch startedAt={startedAt} stoppedAt={finishedAt} penaltySeconds={penaltySeconds} />}
+      {isTimed && (
+        <Stopwatch
+          startedAt={startedAt}
+          stoppedAt={finishedAt}
+          penaltySeconds={penaltySeconds + timePenaltySeconds(liveWrongGuesses)}
+        />
+      )}
 
       {kind === 'regional-full' ? (
         <RoundFlow
@@ -208,6 +217,7 @@ export function ChallengeGame({
           roundNumber={index + 1}
           totalRounds={totalRounds}
           clue={kind === 'flag' ? 'flag' : 'map'}
+          onWrongGuess={() => setLiveWrongGuesses((n) => n + 1)}
           onComplete={(result) => handleGuess(country, result)}
         />
       )}

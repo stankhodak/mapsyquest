@@ -9,7 +9,7 @@ export interface RoundOutcome {
   country: Country;
   /** Medal emoji(s) for the round, e.g. "🥇" or "🥇🥈❌" for a full round. */
   icons: string;
-  /** Right-hand value for the row, e.g. "240 pts" or "+10s". */
+  /** Right-hand value for the row, e.g. "240 pts" or "+5s". */
   detail: string;
 }
 

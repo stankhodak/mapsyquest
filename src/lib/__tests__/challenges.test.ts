@@ -5,6 +5,7 @@ import {
   formatChallengeTime,
   getRegionCountries,
   REGIONS,
+  timePenaltySeconds,
   wrongGuessesForTier,
 } from '../challenges';
 
@@ -61,6 +62,21 @@ describe('wrongGuessesForTier', () => {
 
   it('counts a failed or skipped round as all three tries', () => {
     expect(wrongGuessesForTier(null)).toBe(3);
+  });
+});
+
+describe('timePenaltySeconds', () => {
+  it('charges 5 seconds per wrong guess', () => {
+    expect(timePenaltySeconds(0)).toBe(0);
+    expect(timePenaltySeconds(1)).toBe(5);
+    expect(timePenaltySeconds(3)).toBe(15);
+  });
+
+  it('prices each medal by the wrong guesses before it', () => {
+    expect(timePenaltySeconds(wrongGuessesForTier('gold'))).toBe(0);
+    expect(timePenaltySeconds(wrongGuessesForTier('silver'))).toBe(5);
+    expect(timePenaltySeconds(wrongGuessesForTier('bronze'))).toBe(10);
+    expect(timePenaltySeconds(wrongGuessesForTier(null))).toBe(15);
   });
 });
 

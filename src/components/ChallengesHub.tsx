@@ -112,7 +112,7 @@ export function ChallengesHub({ onBack, account, onLogin, onViewBoard }: Challen
             onClick={() => startGame({ kind: 'time' })}
             emoji="⏱️"
             title="Time Challenge"
-            description={`${CHALLENGE_ROUNDS.time} countries against the clock. Each wrong guess adds ${TIME_PENALTY_SECONDS}s.`}
+            description={`${CHALLENGE_ROUNDS.time} countries against the clock. Each wrong guess adds a ${TIME_PENALTY_SECONDS} sec penalty.`}
           />
           <ChoiceButton
             onClick={() => startGame({ kind: 'flag' })}

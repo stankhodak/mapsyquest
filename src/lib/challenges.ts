@@ -55,7 +55,11 @@ export const CHALLENGE_ROUNDS: Record<ChallengeKind, number> = {
 };
 
 /** Seconds added to the final time for each wrong guess in the Time Challenge. */
-export const TIME_PENALTY_SECONDS = 10;
+export const TIME_PENALTY_SECONDS = 5;
+
+export function timePenaltySeconds(wrongGuesses: number): number {
+  return wrongGuesses * TIME_PENALTY_SECONDS;
+}
 
 export function challengeTitle({ kind, region }: ChallengeSetup): string {
   switch (kind) {
