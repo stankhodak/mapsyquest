@@ -12,6 +12,7 @@ import {
 import { todayKey } from '../lib/daily';
 import { buildGameSummary, countryRoundSummary, fullRoundSummary } from '../lib/gameSummaries';
 import { buildEntry, type BoardEntry } from '../lib/leaderboard';
+import { recordCompletedGame } from '../lib/playerStats';
 import { tierIcon } from '../lib/points';
 import { ChallengeResults, type RoundOutcome } from './ChallengeResults';
 import { CountryStep, type CountryGuessResult } from './CountryStep';
@@ -110,6 +111,13 @@ export function ChallengeGame({
       ...(isTimed ? { timeSeconds: (now - startedAt) / 1000 + penalty, penaltySeconds: penalty } : {}),
     });
     const { earned: newlyEarned } = recordGame(game);
+    if (account) {
+      void recordCompletedGame(
+        account.userId,
+        game.rounds.reduce((sum, r) => sum + r.stars, 0),
+        game.rounds.reduce((sum, r) => sum + r.points, 0),
+      );
+    }
     setEarned(newlyEarned);
     setEntry(
       buildEntry(

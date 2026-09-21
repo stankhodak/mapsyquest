@@ -13,7 +13,7 @@ let queued: Record<string, unknown>[] = [];
 
 function makeBuilder() {
   const builder: Record<string, unknown> = {};
-  for (const method of ['select', 'eq', 'order', 'limit', 'lt', 'gt', 'upsert', 'maybeSingle']) {
+  for (const method of ['select', 'eq', 'order', 'limit', 'lt', 'gt', 'upsert', 'update', 'maybeSingle']) {
     builder[method] = (...args: unknown[]) => {
       calls.push({ method, args });
       return builder;
@@ -33,6 +33,7 @@ vi.mock('../supabaseClient', () => ({
 const {
   BOARDS,
   buildEntry,
+  changeNickname,
   entryFromDailyRecord,
   fetchRank,
   fetchTopScores,
@@ -256,6 +257,39 @@ describe('saveNickname', () => {
   it('stores the trimmed nickname on the account', async () => {
     await saveNickname('  Mapsy ');
     expect(updateUser).toHaveBeenCalledWith({ data: { nickname: 'Mapsy' } });
+  });
+});
+
+describe('changeNickname', () => {
+  it('renames the account and every leaderboard row the player already has', async () => {
+    queued = [{ error: null }];
+    expect(await changeNickname('user-1', '  Mapsy ')).toEqual({ ok: true, value: 'Mapsy' });
+    expect(updateUser).toHaveBeenCalledWith({ data: { nickname: 'Mapsy' } });
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ nickname: 'Mapsy' });
+    expect(calls.find((c) => c.method === 'eq')?.args).toEqual(['user_id', 'user-1']);
+  });
+
+  it('truncates an over-long nickname to 30 characters', async () => {
+    queued = [{ error: null }];
+    const result = await changeNickname('user-1', 'x'.repeat(50));
+    expect(result).toEqual({ ok: true, value: 'x'.repeat(30) });
+  });
+
+  it('refuses an empty nickname before touching the account', async () => {
+    expect((await changeNickname('user-1', '   ')).ok).toBe(false);
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('surfaces an account error and leaves the leaderboard rows alone', async () => {
+    updateUser.mockResolvedValueOnce({ error: { message: 'session expired' } } as never);
+    expect(await changeNickname('user-1', 'Mapsy')).toEqual({ ok: false, error: 'session expired' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('still succeeds if only the leaderboard rows fail to rename', async () => {
+    queued = [{ error: { message: 'boom' } }];
+    expect(await changeNickname('user-1', 'Mapsy')).toEqual({ ok: true, value: 'Mapsy' });
   });
 });
 

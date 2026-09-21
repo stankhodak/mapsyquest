@@ -275,6 +275,25 @@ export async function saveNickname(nickname: string): Promise<void> {
   await supabase?.auth.updateUser({ data: { nickname: nickname.trim().slice(0, MAX_NICKNAME_LENGTH) } });
 }
 
+/**
+ * Changes the player's nickname: on the account (works the same for email and Google
+ * logins) and on every leaderboard row they already have, so old scores don't keep the old
+ * name. Renaming the rows is best-effort - the account is the source of truth, and the
+ * next posted score carries the new name anyway.
+ */
+export async function changeNickname(userId: string, nickname: string): Promise<LeaderboardResult<string>> {
+  if (!supabase) return { ok: false, error: UNAVAILABLE };
+  const cleanNickname = nickname.trim().slice(0, MAX_NICKNAME_LENGTH);
+  if (!cleanNickname) return { ok: false, error: 'Please enter a nickname.' };
+
+  const account = await supabase.auth.updateUser({ data: { nickname: cleanNickname } });
+  if (account.error) return { ok: false, error: account.error.message };
+
+  const rows = await supabase.from(TABLE).update({ nickname: cleanNickname }).eq('user_id', userId);
+  if (rows.error) console.error('Renaming leaderboard rows failed:', rows.error.message);
+  return { ok: true, value: cleanNickname };
+}
+
 /** The nickname to prefill on the post form: a saved nickname, else the first name Google shared, else empty. */
 export function suggestedNickname(metadata: Record<string, unknown> | undefined): string {
   const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
