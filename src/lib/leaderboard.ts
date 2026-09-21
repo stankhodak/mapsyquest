@@ -3,7 +3,7 @@
  * score (see supabase/leaderboard.sql for the table and its rules).
  */
 import { bestKey, bestValue, type GameSummary } from './achievements';
-import { CHALLENGE_ROUNDS, formatChallengeTime, REGIONS } from './challenges';
+import { CHALLENGE_ROUNDS, formatChallengeTime, REGIONS, type ChallengeSetup, type RegionId } from './challenges';
 import { MAX_SCORE, starMultiplier } from './points';
 import { safeGetItem, safeSetItem } from './storage';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
@@ -49,6 +49,16 @@ export const BOARDS: BoardInfo[] = [
     { id: `regional-quiz:${region.id}`, label: `${region.label} · Country Quiz` },
   ]),
 ];
+
+/** The game that produces a board's scores, or null for the daily board (played from the main screen). */
+export function challengeForBoard(board: string): ChallengeSetup | null {
+  if (board === 'time' || board === 'flag') return { kind: board };
+  const [kind, region] = board.split(':');
+  if ((kind === 'regional-full' || kind === 'regional-quiz') && REGIONS.some((r) => r.id === region)) {
+    return { kind, region: region as RegionId };
+  }
+  return null;
+}
 
 export function boardLabel(board: string): string {
   return BOARDS.find((b) => b.id === board)?.label ?? board;

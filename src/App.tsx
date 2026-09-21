@@ -26,7 +26,9 @@ import { recordGame } from './lib/achievementStore';
 import type { EarnedAchievement } from './lib/achievements';
 import { getDailyCountries, todayKey } from './lib/daily';
 import { flagImageUrl } from './lib/flags';
+import type { ChallengeSetup } from './lib/challenges';
 import {
+  challengeForBoard,
   clearPendingEntry,
   entryFromDailyRecord,
   loadPendingEntry,
@@ -131,6 +133,8 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   // The score a guest was offered before logging in, shown again once they're signed in.
   const [pendingEntry, setPendingEntry] = useState<BoardEntry | null>(null);
+  // A game the challenges screen should start as soon as it opens (from a leaderboard's "Take It!").
+  const [challengeToStart, setChallengeToStart] = useState<ChallengeSetup | null>(null);
   // Set when the player presses Play (or dev-Resets); null once the round data itself
   // (results/roundIndex) has been cleared without a fresh play, so the game_abandoned
   // check below can tell "actively mid-game" apart from "sitting on the start screen".
@@ -322,6 +326,17 @@ function App() {
       'Account'
     : null;
 
+  function openChallengesHub(setup: ChallengeSetup | null = null) {
+    setChallengeToStart(setup);
+    setScreen('more-challenges');
+  }
+
+  function takeBoardChallenge(board: string) {
+    const setup = challengeForBoard(board);
+    if (setup) openChallengesHub(setup);
+    else if (!isGameOver) handlePlay();
+  }
+
   function openLeaderboard(board: string) {
     setLeaderboardBoard(board);
     setScreen('leaderboard');
@@ -392,7 +407,7 @@ function App() {
             streak={streak}
             onPlay={handlePlay}
             onViewResults={() => setScreen('game')}
-            onMoreChallenges={() => setScreen('more-challenges')}
+            onMoreChallenges={() => openChallengesHub()}
           />
         )}
 
@@ -402,6 +417,7 @@ function App() {
             account={account}
             onLogin={() => setScreen('login')}
             onViewBoard={openLeaderboard}
+            initialSetup={challengeToStart}
           />
         )}
 
@@ -429,6 +445,8 @@ function App() {
           <LeaderboardScreen
             initialBoard={leaderboardBoard}
             userId={account?.userId ?? null}
+            dailyDone={isGameOver}
+            onTakeIt={takeBoardChallenge}
             onBack={() => setScreen('start')}
           />
         )}

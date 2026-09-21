@@ -19,6 +19,8 @@ interface ChallengesHubProps {
   account: LeaderboardAccount | null;
   onLogin: () => void;
   onViewBoard: (board: string) => void;
+  /** A game to start straight away, e.g. when arriving from a leaderboard's "Take It!" button. */
+  initialSetup?: ChallengeSetup | null;
 }
 
 type HubView = { name: 'menu' } | { name: 'regions' } | { name: 'regional-format'; region: RegionId };
@@ -66,9 +68,11 @@ function BackLink({ onClick, children }: { onClick: () => void; children: ReactN
   );
 }
 
-export function ChallengesHub({ onBack, account, onLogin, onViewBoard }: ChallengesHubProps) {
+export function ChallengesHub({ onBack, account, onLogin, onViewBoard, initialSetup = null }: ChallengesHubProps) {
   const [view, setView] = useState<HubView>({ name: 'menu' });
-  const [game, setGame] = useState<ActiveGame | null>(null);
+  const [game, setGame] = useState<ActiveGame | null>(() =>
+    initialSetup ? { setup: initialSetup, countries: buildChallengeCountries(initialSetup), gameId: 1 } : null,
+  );
 
   function startGame(setup: ChallengeSetup, previousGameId = 0) {
     setGame({ setup, countries: buildChallengeCountries(setup), gameId: previousGameId + 1 });

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import leaderboardSql from '../../../supabase/leaderboard.sql?raw';
 import type { GameSummary, RoundSummary } from '../achievements';
+import { challengeTitle } from '../challenges';
 import type { BoardEntry } from '../leaderboard';
 
 /**
@@ -33,6 +34,7 @@ vi.mock('../supabaseClient', () => ({
 const {
   BOARDS,
   buildEntry,
+  challengeForBoard,
   changeNickname,
   entryFromDailyRecord,
   fetchRank,
@@ -290,6 +292,31 @@ describe('changeNickname', () => {
   it('still succeeds if only the leaderboard rows fail to rename', async () => {
     queued = [{ error: { message: 'boom' } }];
     expect(await changeNickname('user-1', 'Mapsy')).toEqual({ ok: true, value: 'Mapsy' });
+  });
+});
+
+describe('challengeForBoard', () => {
+  it('has no setup for the daily board, which is played from the main screen', () => {
+    expect(challengeForBoard('daily')).toBeNull();
+  });
+
+  it('maps every other board to the game that produces its scores', () => {
+    for (const { id, label } of BOARDS.filter((b) => b.id !== 'daily')) {
+      const setup = challengeForBoard(id);
+      expect(setup, id).not.toBeNull();
+      expect(challengeTitle(setup!), id).toBe(label);
+    }
+  });
+
+  it('carries the region for the regional boards', () => {
+    expect(challengeForBoard('regional-quiz:asia')).toEqual({ kind: 'regional-quiz', region: 'asia' });
+    expect(challengeForBoard('regional-full:islands')).toEqual({ kind: 'regional-full', region: 'islands' });
+    expect(challengeForBoard('time')).toEqual({ kind: 'time' });
+  });
+
+  it('rejects unknown boards', () => {
+    expect(challengeForBoard('regional-quiz:atlantis')).toBeNull();
+    expect(challengeForBoard('nope')).toBeNull();
   });
 });
 
