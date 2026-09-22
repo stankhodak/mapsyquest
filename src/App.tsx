@@ -26,7 +26,13 @@ import type { Country } from './data/types';
 import { recordGame } from './lib/achievementStore';
 import type { EarnedAchievement } from './lib/achievements';
 import { getDailyCountries, todayKey } from './lib/daily';
-import { loadCookieConsent, saveCookieConsent, type CookieConsent } from './lib/cookieConsent';
+import {
+  acceptAllPreferences,
+  loadCookiePreferences,
+  rejectAllPreferences,
+  saveCookiePreferences,
+  type CookiePreferences,
+} from './lib/cookieConsent';
 import { flagImageUrl } from './lib/flags';
 import type { ChallengeSetup } from './lib/challenges';
 import {
@@ -151,12 +157,12 @@ function App() {
   const [gameStartedAt, setGameStartedAt] = useState<number | null>(null);
   // Null until the player has chosen (or chosen again from the Privacy Policy screen) —
   // the banner shows only then. See lib/cookieConsent.ts and lib/posthogClient.ts.
-  const [cookieConsent, setCookieConsent] = useState<CookieConsent | null>(() => loadCookieConsent());
+  const [cookiePreferences, setCookiePreferences] = useState<CookiePreferences | null>(() => loadCookiePreferences());
 
-  function chooseCookieConsent(choice: CookieConsent) {
-    saveCookieConsent(choice);
-    setCookieConsent(choice);
-    if (choice === 'accepted') enablePostHogTracking();
+  function applyCookiePreferences(prefs: CookiePreferences) {
+    saveCookiePreferences(prefs);
+    setCookiePreferences(prefs);
+    if (prefs.analytics) enablePostHogTracking();
     else disablePostHogTracking();
   }
 
@@ -438,9 +444,8 @@ function App() {
         {screen === 'privacy' && (
           <PrivacyPolicyScreen
             onBack={() => setScreen('start')}
-            cookieConsent={cookieConsent}
-            onAcceptCookies={() => chooseCookieConsent('accepted')}
-            onRejectCookies={() => chooseCookieConsent('rejected')}
+            cookiePreferences={cookiePreferences}
+            onSaveCookiePreferences={applyCookiePreferences}
           />
         )}
 
@@ -624,10 +629,10 @@ function App() {
         )}
       </main>
 
-      {cookieConsent === null && (
+      {cookiePreferences === null && (
         <CookieConsentBanner
-          onAccept={() => chooseCookieConsent('accepted')}
-          onReject={() => chooseCookieConsent('rejected')}
+          onAcceptAll={() => applyCookiePreferences(acceptAllPreferences())}
+          onRejectAll={() => applyCookiePreferences(rejectAllPreferences())}
           onPrivacyPolicy={() => setScreen('privacy')}
         />
       )}

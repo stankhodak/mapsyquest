@@ -1,5 +1,5 @@
 import posthog from 'posthog-js';
-import { loadCookieConsent } from './cookieConsent';
+import { loadCookiePreferences } from './cookieConsent';
 
 const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
 
@@ -36,12 +36,12 @@ function init(): void {
 }
 
 // PostHog's default persistence is 'localStorage+cookie', so initializing it is what sets
-// a cookie in the player's browser — this only runs if they already accepted analytics
-// cookies on an earlier visit. First-time (and undecided) visitors get no cookie until the
-// consent banner's "Accept" calls enablePostHogTracking below.
-if (loadCookieConsent() === 'accepted') init();
+// a cookie in the player's browser — this only runs if the analytics category was already
+// on from an earlier visit. First-time (and undecided) visitors get no cookie until the
+// consent banner or the Privacy Policy's Cookies section calls enablePostHogTracking below.
+if (loadCookiePreferences()?.analytics) init();
 
-/** Starts capturing — called when the player accepts analytics cookies. */
+/** Starts capturing — called when the player turns the analytics category on. */
 export function enablePostHogTracking(): void {
   if (!isPostHogConfigured) return;
   if (loaded) posthog.opt_in_capturing();
@@ -50,7 +50,7 @@ export function enablePostHogTracking(): void {
 }
 
 /** Stops capturing and clears whatever PostHog already stored (the cookie included) —
- * called when the player rejects analytics cookies, or changes an earlier "accept". Note:
+ * called when the player turns the analytics category off, having earlier turned it on. Note:
  * opt_out_capturing() alone stops tracking but rewrites the cookie with a fresh (opted-out)
  * state rather than removing it — persistence.clear() is what actually deletes it. */
 export function disablePostHogTracking(): void {
