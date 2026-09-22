@@ -1,14 +1,15 @@
 import { track } from '@vercel/analytics/react';
-import { isPostHogConfigured, posthog } from './posthogClient';
+import { isPostHogTracking, posthog } from './posthogClient';
 
 /**
- * Game-lifecycle events sent to both Vercel Web Analytics (simple counts) and PostHog
- * (funnels/drop-off analysis). Kept spoiler-free and free of any personally identifying
- * data — no country/capital/flag answers, no email or nickname.
+ * Game-lifecycle events sent to both Vercel Web Analytics (simple counts, cookieless — sent
+ * regardless of cookie consent) and PostHog (funnels/drop-off analysis, gated on the player
+ * having accepted analytics cookies — see posthogClient.ts). Kept spoiler-free and free of
+ * any personally identifying data — no country/capital/flag answers, no email or nickname.
  */
 function sendEvent(name: string, properties?: Record<string, number>): void {
   track(name, properties);
-  if (isPostHogConfigured) posthog.capture(name, properties);
+  if (isPostHogTracking()) posthog.capture(name, properties);
 }
 
 /** Fired once per browser per day (the day-lock prevents replay), so this event's daily

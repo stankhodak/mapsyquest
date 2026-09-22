@@ -1,5 +1,11 @@
+import type { CookieConsent } from '../lib/cookieConsent';
+
 interface PrivacyPolicyScreenProps {
   onBack: () => void;
+  /** Null if the player hasn't chosen yet (the banner is still showing). */
+  cookieConsent: CookieConsent | null;
+  onAcceptCookies: () => void;
+  onRejectCookies: () => void;
 }
 
 const CONTACT_EMAIL = 'gamedevestan@gmail.com';
@@ -18,12 +24,12 @@ function BulletList({ items }: { items: React.ReactNode[] }) {
   );
 }
 
-export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
+export function PrivacyPolicyScreen({ onBack, cookieConsent, onAcceptCookies, onRejectCookies }: PrivacyPolicyScreenProps) {
   return (
     <div className="mx-auto w-full max-w-md space-y-5 text-left text-sm text-slate-300">
       <div>
         <h2 className="text-xl font-bold text-slate-100">Privacy Policy</h2>
-        <p className="text-xs text-slate-500">Last updated: September 19, 2026</p>
+        <p className="text-xs text-slate-500">Last updated: September 22, 2026</p>
       </div>
 
       <p>
@@ -40,6 +46,43 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
           were asked and how you answered) always stay local to your browser and are never sent to us, logged in
           or not.
         </p>
+      </div>
+
+      <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <SectionHeading>Cookies</SectionHeading>
+        <p>
+          MapsyQuest itself doesn't need cookies to work — logging in and your local game data both use browser
+          storage, not cookies. The one cookie in play is set by{' '}
+          <span className="font-semibold text-slate-200">PostHog</span>, our analytics provider, to recognize your
+          browser across visits so we can see usage patterns like drop-off between rounds. It's{' '}
+          <span className="font-semibold text-slate-200">off by default</span> and only gets set if you accept it
+          below (or from the banner on your first visit). Vercel Web Analytics, the other analytics tool we use,
+          doesn't use cookies at all and runs regardless of your choice here.
+        </p>
+        <p className="text-xs text-slate-500">
+          Current choice:{' '}
+          <span className="font-semibold text-slate-300">
+            {cookieConsent === 'accepted' ? 'Analytics cookie accepted' : cookieConsent === 'rejected' ? 'Necessary only' : 'Not yet chosen'}
+          </span>
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onRejectCookies}
+            disabled={cookieConsent === 'rejected'}
+            className="flex-1 rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-300 hover:bg-slate-800 disabled:cursor-default disabled:opacity-50"
+          >
+            Necessary only
+          </button>
+          <button
+            type="button"
+            onClick={onAcceptCookies}
+            disabled={cookieConsent === 'accepted'}
+            className="flex-1 rounded-lg bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-3 py-1.5 text-sm font-bold text-slate-950 disabled:cursor-default disabled:opacity-50"
+          >
+            Accept analytics cookie
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -83,8 +126,9 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
             <>
               <span className="font-semibold text-slate-200">Usage information:</span> technical and analytics
               information about how the game is accessed and used — device, browser, general location (typically
-              country-level), pages viewed, and which features get used. Collected via Vercel Web Analytics and
-              PostHog (hosted in the EU).
+              country-level), pages viewed, and which features get used. Collected via Vercel Web Analytics
+              (cookieless, always on) and PostHog (hosted in the EU, uses a cookie, only if you accept it — see
+              "Cookies" above).
             </>,
           ]}
         />
@@ -168,6 +212,7 @@ export function PrivacyPolicyScreen({ onBack }: PrivacyPolicyScreenProps) {
         <BulletList
           items={[
             'You can play MapsyQuest without ever creating an account.',
+            'You can accept or decline the PostHog analytics cookie at any time in the "Cookies" section above — declining also clears anything it already stored in your browser.',
             "You can clear your browser's site data at any time to remove your locally-stored day-by-day round results (this doesn't remove your saved account stats — contact us for that).",
             'You can contact us to ask about, correct, or request deletion of your account and any personal information we hold.',
           ]}
