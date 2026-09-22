@@ -41,7 +41,11 @@ export function LoginScreen({ onBack, onLoggedIn }: LoginScreenProps) {
     setError(null);
     const { error } = await supabase!.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: {
+        redirectTo: window.location.origin,
+        // Without this Google can skip its chooser and silently sign back into the last account (seen on phones).
+        queryParams: { prompt: 'select_account' },
+      },
     });
     if (error) setError(error.message);
   }
