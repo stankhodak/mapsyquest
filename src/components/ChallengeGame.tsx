@@ -110,7 +110,7 @@ export function ChallengeGame({
       rounds: all.map((r) => r.round),
       ...(isTimed ? { timeSeconds: (now - startedAt) / 1000 + penalty, penaltySeconds: penalty } : {}),
     });
-    const { earned: newlyEarned } = recordGame(game);
+    const { earned: newlyEarned } = recordGame(game, 0, account?.userId ?? null);
     if (account) {
       void recordCompletedGame(
         account.userId,

@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   trackGameAbandoned,
   trackGameCompleted,
@@ -40,6 +40,7 @@ import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
 import {
   // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
+  adoptGuestData,
   loadDailyRecord,
   loadStreak,
   saveDailyCompletion,
@@ -131,6 +132,12 @@ function App() {
     | 'post-pending'
   >('start');
   const [session, setSession] = useState<Session | null>(null);
+  // False until Supabase has reported who (if anyone) is logged in, so the screens below
+  // never flash a guest's data for a player who is actually signed in.
+  const [authReady, setAuthReady] = useState(!supabase);
+  const owner = session?.user.id ?? null;
+  // Whose data the screens currently show; undefined until auth is first known.
+  const ownerRef = useRef<string | null | undefined>(undefined);
   // The score a guest was offered before logging in, shown again once they're signed in.
   const [pendingEntry, setPendingEntry] = useState<BoardEntry | null>(null);
   // A game the challenges screen should start as soon as it opens (from a leaderboard's "Take It!").
@@ -192,17 +199,55 @@ function App() {
   // after a Google OAuth redirect back into the app (both go through this callback).
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      // A player arriving from a Google redirect or a confirmation email, having logged in to post a score.
-      if (data.session && !maybePromptNickname(data.session)) offerPendingEntry();
-    });
+
+    // The saved day, streak and achievements belong to whoever is playing, not to the browser.
+    // Called with every session Supabase reports; when the account differs from the one the
+    // screens are showing (first load, login, logout, another account) it loads that owner's
+    // data, and after leaving an account drops everything of theirs still held in memory, so
+    // nothing carries over to the next player.
+    function syncSession(next: Session | null) {
+      setSession(next);
+      setAuthReady(true);
+      const nextOwner = next?.user.id ?? null;
+      const previous = ownerRef.current;
+      if (nextOwner === previous) return;
+      ownerRef.current = nextOwner;
+
+      if (nextOwner && !previous) {
+        adoptGuestData(nextOwner, dateKey);
+        // The guest's day wasn't taken (the account already had one), so its achievements don't apply either.
+        if (loadDailyRecord(dateKey, null)) setDailyEarned([]);
+      }
+      setStoredRecord(loadDailyRecord(dateKey, nextOwner));
+      setStreak(loadStreak(nextOwner));
+
+      if (previous) {
+        setResults([]);
+        setRoundIndex(0);
+        setDailyEarned([]);
+        setGameStartedAt(null);
+        setPendingEntry(null);
+        setChallengeToStart(null);
+        // A guest's offered score is kept while they log in, but not for whoever is on the device after a logout.
+        if (!nextOwner) clearPendingEntry();
+        setScreen('start');
+      }
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        syncSession(data.session);
+        // A player arriving from a Google redirect or a confirmation email, having logged in to post a score.
+        if (data.session && !maybePromptNickname(data.session)) offerPendingEntry();
+      })
+      .catch(() => setAuthReady(true));
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
+      syncSession(newSession);
       maybePromptNickname(newSession);
     });
     return () => subscription.subscription.unsubscribe();
-  }, []);
+  }, [dateKey]);
 
   function handleLogout() {
     supabase?.auth.signOut();
@@ -239,12 +284,15 @@ function App() {
         totalStars: next.reduce((sum, r) => sum + r.stars, 0),
         totalPoints: next.reduce((sum, r) => sum + r.points, 0),
       };
-      const newStreak = saveDailyCompletion(record);
+      const newStreak = saveDailyCompletion(record, owner);
       setStreak(newStreak);
       setStoredRecord(record);
       setDailyEarned(
-        recordGame(buildGameSummary({ kind: 'daily', rounds: next.map(fullRoundSummary) }), newStreak.currentStreak)
-          .earned,
+        recordGame(
+          buildGameSummary({ kind: 'daily', rounds: next.map(fullRoundSummary) }),
+          newStreak.currentStreak,
+          owner,
+        ).earned,
       );
       trackGameCompleted(record.totalStars, record.totalPoints, playOrder.length);
       if (gameStartedAt !== null) {
@@ -368,10 +416,12 @@ function App() {
             MapsyQuest
           </h1>
         </div>
-        {displayName && session && <AccountBadge displayName={displayName} userId={session.user.id} />}
+        {displayName && session && (
+          <AccountBadge key={session.user.id} displayName={displayName} userId={session.user.id} />
+        )}
       </header>
 
-      <main>
+      <main hidden={!authReady}>
         {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
 
         {screen === 'scoring' && <ScoringGuideScreen onBack={() => setScreen('start')} />}
