@@ -420,6 +420,7 @@ function App() {
           up with the map's left border regardless of viewport size. */}
       <header className="relative left-1/2 z-20 mb-8 grid w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] items-start md:mb-3">
         <MenuDropdown
+          onMoreChallenges={() => openChallengesHub()}
           onPrivacyPolicy={() => setScreen('privacy')}
           onScoringGuide={() => setScreen('scoring')}
           onLeaderboards={() => openLeaderboard('daily')}

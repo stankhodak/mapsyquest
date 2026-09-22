@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface MenuDropdownProps {
+  onMoreChallenges: () => void;
   onPrivacyPolicy: () => void;
   onScoringGuide: () => void;
   onLeaderboards: () => void;
@@ -14,6 +15,7 @@ const DONATE_URL = 'https://ko-fi.com/gamesbonds';
 
 /** Bubble menu to the left of the title. */
 export function MenuDropdown({
+  onMoreChallenges,
   onPrivacyPolicy,
   onScoringGuide,
   onLeaderboards,
@@ -64,12 +66,11 @@ export function MenuDropdown({
             type="button"
             onClick={() => {
               setIsOpen(false);
-              if (userEmail) onLogout();
-              else onLoginClick();
+              onMoreChallenges();
             }}
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+            className={`flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200 ${userEmail ? 'border-t border-slate-700/60' : ''}`}
           >
-            <span>🔑</span> {userEmail ? 'Log out' : 'Login'}
+            <span>🧭</span> More Challenges
           </button>
           <button
             type="button"
@@ -110,6 +111,17 @@ export function MenuDropdown({
           >
             <span>💖</span> Donate
           </a>
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              if (userEmail) onLogout();
+              else onLoginClick();
+            }}
+            className="flex w-full items-center gap-2 border-t border-slate-700/60 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+          >
+            <span>🔑</span> {userEmail ? 'Log out' : 'Login'}
+          </button>
         </div>
       )}
     </div>
