@@ -10,6 +10,7 @@ import {
 import { AccountBadge } from './components/AccountBadge';
 import { AchievementsPanel } from './components/AchievementsPanel';
 import { ChooseNicknameScreen } from './components/ChooseNicknameScreen';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { FeedbackScreen } from './components/FeedbackScreen';
 import { LeaderboardOffer, type LeaderboardAccount } from './components/LeaderboardOffer';
 import { LeaderboardScreen } from './components/LeaderboardScreen';
@@ -25,6 +26,13 @@ import type { Country } from './data/types';
 import { recordGame } from './lib/achievementStore';
 import type { EarnedAchievement } from './lib/achievements';
 import { getDailyCountries, todayKey } from './lib/daily';
+import {
+  acceptAllPreferences,
+  loadCookiePreferences,
+  rejectAllPreferences,
+  saveCookiePreferences,
+  type CookiePreferences,
+} from './lib/cookieConsent';
 import { flagImageUrl } from './lib/flags';
 import type { ChallengeSetup } from './lib/challenges';
 import {
@@ -36,6 +44,7 @@ import {
   type BoardEntry,
 } from './lib/leaderboard';
 import { buildGameSummary, fullRoundSummary } from './lib/gameSummaries';
+import { disablePostHogTracking, enablePostHogTracking } from './lib/posthogClient';
 import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
 import {
@@ -146,6 +155,16 @@ function App() {
   // (results/roundIndex) has been cleared without a fresh play, so the game_abandoned
   // check below can tell "actively mid-game" apart from "sitting on the start screen".
   const [gameStartedAt, setGameStartedAt] = useState<number | null>(null);
+  // Null until the player has chosen (or chosen again from the Privacy Policy screen) —
+  // the banner shows only then. See lib/cookieConsent.ts and lib/posthogClient.ts.
+  const [cookiePreferences, setCookiePreferences] = useState<CookiePreferences | null>(() => loadCookiePreferences());
+
+  function applyCookiePreferences(prefs: CookiePreferences) {
+    saveCookiePreferences(prefs);
+    setCookiePreferences(prefs);
+    if (prefs.analytics) enablePostHogTracking();
+    else disablePostHogTracking();
+  }
 
   useEffect(() => {
     if (!showCopiedNotice) return;
@@ -422,7 +441,13 @@ function App() {
       </header>
 
       <main hidden={!authReady}>
-        {screen === 'privacy' && <PrivacyPolicyScreen onBack={() => setScreen('start')} />}
+        {screen === 'privacy' && (
+          <PrivacyPolicyScreen
+            onBack={() => setScreen('start')}
+            cookiePreferences={cookiePreferences}
+            onSaveCookiePreferences={applyCookiePreferences}
+          />
+        )}
 
         {screen === 'scoring' && <ScoringGuideScreen onBack={() => setScreen('start')} />}
 
@@ -603,6 +628,14 @@ function App() {
           </div>
         )}
       </main>
+
+      {cookiePreferences === null && (
+        <CookieConsentBanner
+          onAcceptAll={() => applyCookiePreferences(acceptAllPreferences())}
+          onRejectAll={() => applyCookiePreferences(rejectAllPreferences())}
+          onPrivacyPolicy={() => setScreen('privacy')}
+        />
+      )}
     </div>
   );
 }
