@@ -46,13 +46,21 @@ const CAPITAL_COORD_OVERRIDES = {
 };
 
 const capitalsByIso = new Map();
+// Non-capital cities per country, most populous first — fallback pin spots for
+// curved countries whose centroid falls outside their own outline.
+const citiesByIso = new Map();
 for (const city of cities) {
-  if (city.featureCode !== 'PPLC') continue;
   const iso = city.country.toLowerCase();
+  if (city.featureCode !== 'PPLC') {
+    if (!citiesByIso.has(iso)) citiesByIso.set(iso, []);
+    citiesByIso.get(iso).push(city);
+    continue;
+  }
   if (!capitalsByIso.has(iso)) {
     capitalsByIso.set(iso, { lat: city.loc.coordinates[1], lng: city.loc.coordinates[0] });
   }
 }
+for (const list of citiesByIso.values()) list.sort((a, b) => b.population - a.population);
 
 // world-countries' `latlng` is a hand-picked centroid that, for split/archipelago
 // countries (e.g. Equatorial Guinea's mainland + Bioko island), can land in open
@@ -164,14 +172,22 @@ function nearestOuterRingToCapital(geometry, capital) {
 
 /**
  * A point guaranteed to sit on the country's landmass closest to its capital: the
- * area centroid of that landmass's outer ring, falling back to the vertex average,
- * then a boundary vertex, for the rare concave shape where the centroid itself
- * lands outside the ring.
+ * area centroid of that landmass's outer ring. For curved shapes (Vietnam, Chile)
+ * where the centroid lands outside the ring, use the country's most populous
+ * non-capital city on that landmass instead — a boundary vertex would put the pin
+ * on a border, where it reads as the neighbouring country. The capital is skipped
+ * so the pin doesn't give away the capital step. Vertex average, then a boundary
+ * vertex, remain as last resorts.
  */
-function computeLandCenter(geometry, capital) {
+function computeLandCenter(geometry, capital, iso) {
   const outerRing = nearestOuterRingToCapital(geometry, capital);
   const centroid = ringCentroid(outerRing);
   let point = centroid;
+
+  if (!pointInRing(point, outerRing)) {
+    const city = (citiesByIso.get(iso) ?? []).find((c) => pointInRing(c.loc.coordinates, outerRing));
+    if (city) return { lat: city.loc.coordinates[1], lng: city.loc.coordinates[0] };
+  }
 
   if (!pointInRing(point, outerRing)) {
     const n = outerRing.length;
@@ -184,12 +200,12 @@ function computeLandCenter(geometry, capital) {
 }
 
 const countryGeometries = countriesTopology.objects.countries.geometries;
-function landCenterFor(ccn3, capital) {
+function landCenterFor(ccn3, capital, iso) {
   const geom = countryGeometries.find((g) => g.id === ccn3);
   if (!geom) return null;
   const feature = topojson.feature(countriesTopology, { type: 'GeometryCollection', geometries: [geom] });
   const geometry = feature.features ? feature.features[0].geometry : feature.geometry;
-  const { lat, lng } = computeLandCenter(geometry, capital);
+  const { lat, lng } = computeLandCenter(geometry, capital, iso);
   return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
 }
 
@@ -211,7 +227,7 @@ function toCountryRecord(source) {
     name: source.name.common,
     capital: source.capital[0],
     region: source.region,
-    center: landCenterFor(source.ccn3, capitalCoords) ?? { lat: source.latlng[0], lng: source.latlng[1] },
+    center: landCenterFor(source.ccn3, capitalCoords, id) ?? { lat: source.latlng[0], lng: source.latlng[1] },
     capitalCoords,
     mapZoom: estimateMapZoom(source.area),
     settlementCount: FEW_SETTLEMENTS.has(id) ? 'few' : 'many',
