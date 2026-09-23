@@ -121,6 +121,23 @@ function lngDistance(a, b) {
 }
 
 /**
+ * Distance from the capital to a landmass: 0 when the capital sits on it, otherwise
+ * the distance to its nearest boundary vertex. Measuring to the landmass itself, not
+ * its centroid, matters for small exclaves: Oman's Madha exclave (inside the UAE)
+ * has a centroid nearer Muscat than mainland Oman's centroid is, which put Oman's
+ * country-step pin in the middle of the UAE.
+ */
+function distanceToRing(capital, ring) {
+  const unwrappedLng = ring.some(([lng]) => lng > 180) && capital.lng < 0 ? capital.lng + 360 : capital.lng;
+  if (pointInRing([unwrappedLng, capital.lat], ring)) return 0;
+  let best = Infinity;
+  for (const [lng, lat] of ring) {
+    best = Math.min(best, Math.hypot(lngDistance(wrapLng(lng), capital.lng), lat - capital.lat));
+  }
+  return best;
+}
+
+/**
  * The (antimeridian-unwrapped) outer ring of whichever polygon part sits closest to
  * the capital — NOT necessarily the largest landmass. For split-territory countries
  * (Equatorial Guinea's Bioko vs. mainland Río Muni; Kiribati's Gilbert vs. Line
@@ -136,8 +153,7 @@ function nearestOuterRingToCapital(geometry, capital) {
   let bestDist = Infinity;
   for (const polygonCoords of polygons) {
     const ring = unwrapRingLongitudes(polygonCoords[0]);
-    const [cx, cy] = ringCentroid(ring);
-    const dist = Math.hypot(lngDistance(wrapLng(cx), capital.lng), cy - capital.lat);
+    const dist = distanceToRing(capital, ring);
     if (dist < bestDist) {
       bestDist = dist;
       best = ring;
