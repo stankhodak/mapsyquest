@@ -12,7 +12,7 @@
 // One small country (Tuvalu) has no usable shape even at this resolution and is
 // simply omitted — consumers should treat a missing lookup as "no shape available"
 // and fall back to the existing zoom behaviour.
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import * as topojson from 'topojson-client';
@@ -132,9 +132,20 @@ const simplifiedGeometries = topo.objects.countries.geometries;
 const rawGeometries = rawTopology.objects.countries.geometries;
 const roster = [...worldCountries.filter((c) => c.unMember), worldCountries.find((c) => c.cca2 === 'VA')];
 
+// Natural Earth's 50m Vatican is a ~1 km box centred ~1.9 km west of the real city-state, so
+// its outline sat off the capital pin. world-countries' own Vatican polygon is in the right place.
+const vaticanGeometry = JSON.parse(
+  readFileSync(new URL('../node_modules/world-countries/data/vat.geo.json', import.meta.url), 'utf8'),
+).features[0].geometry;
+
 const shapes = {};
 const missing = [];
 for (const c of roster) {
+  if (c.cca2 === 'VA') {
+    const geometry = { type: vaticanGeometry.type, coordinates: roundCoords(vaticanGeometry.coordinates, SMALL_COORD_DECIMALS) };
+    shapes.va = { bbox: boundingBox(geometry, SMALL_COORD_DECIMALS), geometry };
+    continue;
+  }
   // Tiny countries lose their shape entirely under the global simplification
   // threshold (see SMALL_AREA_KM2 above), so they're extracted from the
   // untouched topology instead, at finer coordinate precision.

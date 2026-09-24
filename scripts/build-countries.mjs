@@ -45,6 +45,13 @@ const CAPITAL_COORD_OVERRIDES = {
   il: { lat: 31.7683, lng: 35.2137 }, // Jerusalem
 };
 
+// Vatican City sits inside Rome, so zooming in on it hides all context. It's framed at
+// Italy's zoom instead (see MAP_ZOOM_FRAMED_LIKE below) so the map shows Italy with the pin on Rome.
+const MAP_ZOOM_FRAMED_LIKE = { va: 'it' };
+// Natural Earth's Vatican is offset ~1.9 km west of the real one (see build-country-shapes.mjs),
+// so its computed centre is off too — world-countries' own `latlng` is used for it instead.
+const USE_SOURCE_LATLNG_CENTER = new Set(['va']);
+
 const capitalsByIso = new Map();
 // Non-capital cities per country, most populous first — fallback pin spots for
 // curved countries whose centroid falls outside their own outline.
@@ -227,7 +234,11 @@ function toCountryRecord(source) {
     name: source.name.common,
     capital: source.capital[0],
     region: source.region,
-    center: landCenterFor(source.ccn3, capitalCoords, id) ?? { lat: source.latlng[0], lng: source.latlng[1] },
+    center:
+      (USE_SOURCE_LATLNG_CENTER.has(id) ? null : landCenterFor(source.ccn3, capitalCoords, id)) ?? {
+        lat: source.latlng[0],
+        lng: source.latlng[1],
+      },
     capitalCoords,
     mapZoom: estimateMapZoom(source.area),
     settlementCount: FEW_SETTLEMENTS.has(id) ? 'few' : 'many',
@@ -244,6 +255,9 @@ for (const c of [...worldCountries.filter((c) => c.unMember), vatican]) {
 const records = [...sourceById.values()]
   .map(toCountryRecord)
   .sort((a, b) => a.name.localeCompare(b.name));
+for (const [id, likeId] of Object.entries(MAP_ZOOM_FRAMED_LIKE)) {
+  records.find((r) => r.id === id).mapZoom = records.find((r) => r.id === likeId).mapZoom;
+}
 
 // --- Write src/data/countries.ts ---
 
