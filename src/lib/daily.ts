@@ -42,8 +42,15 @@ export function msUntilNextDay(now: Date = new Date()): number {
   return nextMidnight.getTime() - now.getTime();
 }
 
-/** Selects this day's 7 countries, deterministic per date key. */
-export function getDailyCountries(dateKey: string = todayKey()): Country[] {
+/** A country isn't picked again until this many days after it last appeared. */
+export const LOOKBACK_DAYS = 14;
+/** The day the no-repeat history starts from. Each day's pick depends on the days before it,
+ * so it has to be built forward from a fixed point; dates before it get the plain seeded pick. */
+const LOOKBACK_EPOCH = '2026-09-01';
+/** Guards the forward build against an absurd date (e.g. a clock set centuries ahead). */
+const MAX_LOOKBACK_SPAN_DAYS = 5000;
+
+function shuffledPoolFor(dateKey: string): Country[] {
   const rng = mulberry32(seedFromDateKey(dateKey));
   const pool = [...countries];
 
@@ -52,8 +59,70 @@ export function getDailyCountries(dateKey: string = todayKey()): Country[] {
     const j = Math.floor(rng() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
+  return pool;
+}
 
-  return selectWithIslandCaps(pool, ROUNDS_PER_DAY);
+function dateKeyMs(dateKey: string): number {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+/** Whole days from one date key to another (negative if `to` is earlier). */
+function daysBetween(from: string, to: string): number {
+  return Math.round((dateKeyMs(to) - dateKeyMs(from)) / 86_400_000);
+}
+
+function dateKeyAtDay(dayIndex: number): string {
+  const d = new Date(dateKeyMs(LOOKBACK_EPOCH) + dayIndex * 86_400_000);
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${m}-${day}`;
+}
+
+/**
+ * Like selectWithIslandCaps, but countries seen in the last `lookbackDays` days go to the back
+ * of the queue (least recently seen first), so they're only reached if the fresh countries
+ * can't fill the day under the island caps. `lastSeen` maps a country id to the day index it
+ * last appeared on.
+ */
+export function selectWithLookback(
+  shuffledPool: Country[],
+  lastSeen: ReadonlyMap<string, number>,
+  dayIndex: number,
+  lookbackDays: number,
+  count: number,
+): Country[] {
+  const fresh: Country[] = [];
+  const recent: Country[] = [];
+  for (const country of shuffledPool) {
+    const seen = lastSeen.get(country.id);
+    (seen !== undefined && dayIndex - seen < lookbackDays ? recent : fresh).push(country);
+  }
+  recent.sort((a, b) => lastSeen.get(a.id)! - lastSeen.get(b.id)!);
+  return selectWithIslandCaps([...fresh, ...recent], count);
+}
+
+// Picks for LOOKBACK_EPOCH + i days, built forward on demand and kept for the session.
+const pickHistory: Country[][] = [];
+const lastSeenDay = new Map<string, number>();
+
+function extendHistoryThrough(dayIndex: number): void {
+  while (pickHistory.length <= dayIndex) {
+    const i = pickHistory.length;
+    const picks = selectWithLookback(shuffledPoolFor(dateKeyAtDay(i)), lastSeenDay, i, LOOKBACK_DAYS, ROUNDS_PER_DAY);
+    for (const country of picks) lastSeenDay.set(country.id, i);
+    pickHistory.push(picks);
+  }
+}
+
+/** Selects this day's 7 countries, deterministic per date key, with none repeating from the previous LOOKBACK_DAYS days. */
+export function getDailyCountries(dateKey: string = todayKey()): Country[] {
+  const dayIndex = daysBetween(LOOKBACK_EPOCH, dateKey);
+  if (!Number.isFinite(dayIndex) || dayIndex < 0 || dayIndex > MAX_LOOKBACK_SPAN_DAYS) {
+    return selectWithIslandCaps(shuffledPoolFor(dateKey), ROUNDS_PER_DAY);
+  }
+  extendHistoryThrough(dayIndex);
+  return [...pickHistory[dayIndex]];
 }
 
 /**
