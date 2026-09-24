@@ -6,10 +6,13 @@
 --   period  the date (YYYY-MM-DD) for the daily board, 'all' for every other board
 --   score   points (higher is better), or seconds for the 'time' board (lower is better)
 --
--- Scores are computed in the browser, so a determined player could post a fake one. The
--- range checks below only stop impossible values (more than a perfect game, negative time).
--- The maxima must match MAX_DAILY_POINTS / MAX_QUIZ_POINTS in src/lib/leaderboard.ts (a test
--- reads this file to make sure they do).
+-- Scores are computed in the browser, so a determined player could still post a fake one:
+-- the game has no server to check answers against. What the database does enforce is
+-- everything around the score - the range checks below stop impossible values (more than a
+-- perfect game, negative time), and the guard trigger further down stops a player editing
+-- the ordering fields (created_at breaks ties), re-pointing a row, or posting to a day that
+-- isn't today. The maxima must match MAX_DAILY_POINTS / MAX_QUIZ_POINTS in
+-- src/lib/leaderboard.ts (a test reads this file to make sure they do).
 
 create table if not exists public.mapsyquest_leaderboard (
   id           uuid primary key default gen_random_uuid(),
@@ -45,6 +48,71 @@ create table if not exists public.mapsyquest_leaderboard (
 -- Serves the "top N for a board" query.
 create index if not exists mapsyquest_leaderboard_board_score
   on public.mapsyquest_leaderboard (board, period, score);
+
+-- Extra limits, added as separate idempotent statements so re-running also repairs an older table.
+
+-- At most 3 stars a round, 10 rounds in the longest game.
+alter table public.mapsyquest_leaderboard drop constraint if exists mapsyquest_leaderboard_stars_range;
+alter table public.mapsyquest_leaderboard add constraint mapsyquest_leaderboard_stars_range
+  check (stars between 0 and 30);
+
+-- No control characters in a name that is shown to every visitor.
+alter table public.mapsyquest_leaderboard drop constraint if exists mapsyquest_leaderboard_nickname_chars;
+alter table public.mapsyquest_leaderboard add constraint mapsyquest_leaderboard_nickname_chars
+  check (nickname !~ '[[:cntrl:]]');
+
+-- Achievement ids are short kebab-case slugs (see ACHIEVEMENTS in src/lib/achievements.ts);
+-- this keeps the array from carrying arbitrary text or growing without bound.
+create or replace function public.mapsyquest_valid_achievements(ids text[])
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(cardinality(ids), 0) <= 40
+    and not exists (select 1 from unnest(ids) as id where id is null or id !~ '^[a-z0-9-]{1,40}$')
+$$;
+
+alter table public.mapsyquest_leaderboard drop constraint if exists mapsyquest_leaderboard_achievements_valid;
+alter table public.mapsyquest_leaderboard add constraint mapsyquest_leaderboard_achievements_valid
+  check (public.mapsyquest_valid_achievements(achievements));
+
+-- Guard trigger. The row-level policies below let a player write their own rows, but they
+-- can't say which columns may change - so this does:
+--   * created_at is the tie-breaker on the boards (earlier wins), so it is always set by the
+--     server and never editable. id, user_id, board and period can't be changed either.
+--   * a daily score can only be posted for a day that is (about) today - one day either side
+--     covers every timezone - so nobody can pre-fill tomorrow's board or backfill old ones.
+--     Renaming (which touches old rows without changing their score) is unaffected.
+create or replace function public.mapsyquest_leaderboard_guard()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.created_at := now();
+  else
+    new.id := old.id;
+    new.user_id := old.user_id;
+    new.board := old.board;
+    new.period := old.period;
+    new.created_at := old.created_at;
+  end if;
+  new.updated_at := now();
+
+  if new.board = 'daily'
+     and (tg_op = 'INSERT' or new.score is distinct from old.score)
+     and (new.period::date < current_date - 1 or new.period::date > current_date + 1) then
+    raise exception 'daily scores can only be posted for today' using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists mapsyquest_leaderboard_guard on public.mapsyquest_leaderboard;
+create trigger mapsyquest_leaderboard_guard
+  before insert or update on public.mapsyquest_leaderboard
+  for each row execute function public.mapsyquest_leaderboard_guard();
 
 alter table public.mapsyquest_leaderboard enable row level security;
 

@@ -30,6 +30,13 @@ function init(): void {
     // currently call posthog.identify() (no tie-in to Supabase accounts), so there's
     // no "identified" user to merge profiles for anyway.
     person_profiles: 'identified_only',
+    // The game sends its own spoiler- and PII-free events (lib/analytics.ts). Autocapture,
+    // heatmaps, dead-click capture and replay would also record the text of whatever is
+    // clicked or shown — including the nickname/email on the account badge and menu.
+    autocapture: false,
+    capture_heatmaps: false,
+    capture_dead_clicks: false,
+    disable_session_recording: true,
   });
   loaded = true;
   initialized = true;

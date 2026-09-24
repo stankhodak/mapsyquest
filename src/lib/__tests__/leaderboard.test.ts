@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import leaderboardSql from '../../../supabase/leaderboard.sql?raw';
-import type { GameSummary, RoundSummary } from '../achievements';
-import { challengeTitle } from '../challenges';
+import { ACHIEVEMENTS, type GameSummary, type RoundSummary } from '../achievements';
+import { CHALLENGE_ROUNDS, challengeTitle } from '../challenges';
 import type { BoardEntry } from '../leaderboard';
 
 /**
@@ -384,6 +384,19 @@ describe('supabase/leaderboard.sql', () => {
   it("range-checks quiz and flag boards at the game's real maximum", () => {
     expect(MAX_QUIZ_POINTS).toBe(1000);
     expect(sql).toContain(`score between 0 and ${MAX_QUIZ_POINTS}`);
+  });
+
+  it('caps stars at what the longest game can earn (3 a round)', () => {
+    const maxStars = 3 * Math.max(...Object.values(CHALLENGE_ROUNDS));
+    expect(maxStars).toBe(30);
+    expect(sql).toContain(`stars between 0 and ${maxStars}`);
+  });
+
+  it('accepts every achievement id the app can post', () => {
+    // Mirrors mapsyquest_valid_achievements: short kebab-case slugs, at most 40 of them.
+    expect(ACHIEVEMENTS.length).toBeLessThanOrEqual(40);
+    expect(sql).toContain("'^[a-z0-9-]{1,40}$'");
+    for (const { id } of ACHIEVEMENTS) expect(id).toMatch(/^[a-z0-9-]{1,40}$/);
   });
 
   it('allows exactly the boards the app has', () => {
