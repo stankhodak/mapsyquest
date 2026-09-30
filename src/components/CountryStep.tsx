@@ -15,13 +15,22 @@ export interface CountryGuessResult {
   tier: StarTier;
 }
 
+/** Everything needed to pick the step up again exactly where it was left. */
+export interface CountryStepState {
+  /** Wrong guesses so far; reported straight away, before the round has finished (e.g. to charge a time penalty). */
+  wrongGuesses: number;
+  /** Set the moment the step is decided, so leaving during the feedback pause still finishes it on return. */
+  result: CountryGuessResult | null;
+}
+
 interface CountryStepProps {
   answer: Country;
   roundNumber: number;
   totalRounds: number;
   onComplete: (result: CountryGuessResult) => void;
-  /** Called as soon as a guess is wrong, before the round has finished (e.g. to charge a time penalty). */
-  onWrongGuess?: () => void;
+  /** Where to resume from, if the step was left part-way. */
+  saved?: CountryStepState | null;
+  onStateChange?: (state: CountryStepState) => void;
   /** What the player identifies the country from: its spot on the map (default) or its flag. */
   clue?: 'map' | 'flag';
 }
@@ -42,16 +51,18 @@ export function CountryStep({
   roundNumber,
   totalRounds,
   onComplete,
-  onWrongGuess,
+  saved = null,
+  onStateChange,
   clue = 'map',
 }: CountryStepProps) {
+  const [stepState, setStepState] = useState<CountryStepState>(() => saved ?? { wrongGuesses: 0, result: null });
   const [query, setQuery] = useState('');
-  const [tryNumber, setTryNumber] = useState(1);
+  const [tryNumber, setTryNumber] = useState(() => Math.min(stepState.wrongGuesses + 1, MAX_TRIES));
   const [flashSignal, setFlashSignal] = useState(0);
   const [flashGuessId, setFlashGuessId] = useState<string | null>(null);
   const [correctFlashSignal, setCorrectFlashSignal] = useState(0);
-  const [locked, setLocked] = useState(false);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [locked, setLocked] = useState(stepState.result !== null);
+  const [feedback, setFeedback] = useState<Feedback | null>(() => feedbackFor(stepState.result));
   const [showPickHint, setShowPickHint] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +75,21 @@ export function CountryStep({
       inputRef.current?.focus();
     }
   }, []);
+
+  useEffect(() => {
+    onStateChange?.(stepState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepState]);
+
+  // Advances once the feedback has shown. Cleared on unmount, so leaving mid-pause
+  // doesn't complete a step nobody is looking at — it completes on return instead.
+  useEffect(() => {
+    const result = stepState.result;
+    if (!result) return;
+    const id = window.setTimeout(() => onComplete(result), FEEDBACK_DELAY_MS);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepState.result]);
 
   const trimmed = query.trim();
   const matches =
@@ -90,10 +116,10 @@ export function CountryStep({
       const score = Math.round(MAX_SCORE.country * tryFraction(tryNumber));
       setFeedback({ tone: 'correct', label: 'Correct!' });
       setCorrectFlashSignal((s) => s + 1);
-      window.setTimeout(
-        () => onComplete({ guess: name, isCorrect: true, score, tier: tierForTry(tryNumber) }),
-        FEEDBACK_DELAY_MS,
-      );
+      setStepState((prev) => ({
+        ...prev,
+        result: { guess: name, isCorrect: true, score, tier: tierForTry(tryNumber) },
+      }));
       return;
     }
 
@@ -101,14 +127,14 @@ export function CountryStep({
     setFlashGuessId(guessedCountry.id);
     setFlashSignal((s) => s + 1);
     setFeedback({ tone: 'wrong', label: 'Nope!' });
-    onWrongGuess?.();
 
     if (tryNumber >= MAX_TRIES) {
-      window.setTimeout(
-        () => onComplete({ guess: name, isCorrect: false, score: 0, tier: null }),
-        FEEDBACK_DELAY_MS,
-      );
+      setStepState((prev) => ({
+        wrongGuesses: prev.wrongGuesses + 1,
+        result: { guess: name, isCorrect: false, score: 0, tier: null },
+      }));
     } else {
+      setStepState((prev) => ({ ...prev, wrongGuesses: prev.wrongGuesses + 1 }));
       window.setTimeout(() => {
         setTryNumber((t) => t + 1);
         setQuery('');
@@ -237,6 +263,11 @@ export function CountryStep({
       </div>
     </div>
   );
+}
+
+function feedbackFor(result: CountryGuessResult | null): Feedback | null {
+  if (!result) return null;
+  return result.isCorrect ? { tone: 'correct', label: 'Correct!' } : { tone: 'wrong', label: 'Nope!' };
 }
 
 function findCountry(name: string): Country | undefined {

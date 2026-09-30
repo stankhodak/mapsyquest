@@ -17,7 +17,7 @@ import { LeaderboardScreen } from './components/LeaderboardScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { MenuDropdown } from './components/MenuDropdown';
 import { PrivacyPolicyScreen } from './components/PrivacyPolicyScreen';
-import { RoundFlow, type RoundResult, type RoundTiers } from './components/RoundFlow';
+import { RoundFlow, type RoundProgress, type RoundResult, type RoundTiers } from './components/RoundFlow';
 import { ScoringGuideScreen } from './components/ScoringGuideScreen';
 import { ChallengesHub } from './components/ChallengesHub';
 import { StartScreen } from './components/StartScreen';
@@ -50,9 +50,13 @@ import { tierIcon } from './lib/points';
 import {
   // clearDailyRecord, // only used by the disabled Reset button — restore alongside it
   adoptGuestData,
+  clearProgress,
   loadDailyRecord,
+  loadProgress,
   loadStreak,
   saveDailyCompletion,
+  saveProgress,
+  type StorageOwner,
   type StoredDailyRecord,
   type StreakState,
 } from './lib/storage';
@@ -89,6 +93,22 @@ function buildShareText(
   return lines.join('\n');
 }
 
+/** Today's daily game, left part-way: saved so it resumes (until the day changes) after the player leaves it. */
+interface DailyProgress {
+  results: RoundResult[];
+  /** The round being played, part-way. */
+  round: RoundProgress | null;
+  startedAt: number | null;
+}
+
+/** The daily game this player left unfinished today, if it still lines up with today's countries. */
+function loadDailyProgress(dateKey: string, playOrder: Country[], owner: StorageOwner): DailyProgress | null {
+  const saved = loadProgress<DailyProgress>('daily-progress', dateKey, owner);
+  if (!saved || saved.results.length >= playOrder.length) return null;
+  if (saved.results.some((r, i) => r.country.id !== playOrder[i].id)) return null;
+  return saved;
+}
+
 // Reset hidden for now — uncomment this function and the button below to restore it.
 // function shuffle<T>(items: T[]): T[] {
 //   const copy = [...items];
@@ -113,8 +133,11 @@ function App() {
     loadDailyRecord(dateKey),
   );
   const [streak, setStreak] = useState<StreakState>(() => loadStreak());
-  const [roundIndex, setRoundIndex] = useState(0);
-  const [results, setResults] = useState<RoundResult[]>([]);
+  // Read once on load; the account's own copy replaces it once auth is known (see syncSession).
+  const [savedDaily] = useState(() => loadDailyProgress(dateKey, playOrder, null));
+  const [roundIndex, setRoundIndex] = useState(() => savedDaily?.results.length ?? 0);
+  const [results, setResults] = useState<RoundResult[]>(() => savedDaily?.results ?? []);
+  const [roundProgress, setRoundProgress] = useState<RoundProgress | null>(() => savedDaily?.round ?? null);
   // Bumped on reset so RoundFlow remounts even when round 1's country id is unchanged.
   // Setter is `_`-prefixed for the same reason as _setPlayOrder above — restore both
   // together (rename `_setResetCount` -> `setResetCount` here, uncomment handleReset).
@@ -155,6 +178,8 @@ function App() {
   // (results/roundIndex) has been cleared without a fresh play, so the game_abandoned
   // check below can tell "actively mid-game" apart from "sitting on the start screen".
   const [gameStartedAt, setGameStartedAt] = useState<number | null>(null);
+  // When a resumed game was first started, so its duration still counts from then.
+  const [resumedStartedAt, setResumedStartedAt] = useState<number | null>(() => savedDaily?.startedAt ?? null);
   // Null until the player has chosen (or chosen again from the Privacy Policy screen) —
   // the banner shows only then. See lib/cookieConsent.ts and lib/posthogClient.ts.
   const [cookiePreferences, setCookiePreferences] = useState<CookiePreferences | null>(() => loadCookiePreferences());
@@ -239,10 +264,13 @@ function App() {
       }
       setStoredRecord(loadDailyRecord(dateKey, nextOwner));
       setStreak(loadStreak(nextOwner));
+      const progress = loadDailyProgress(dateKey, playOrder, nextOwner);
+      setResults(progress?.results ?? []);
+      setRoundIndex(progress?.results.length ?? 0);
+      setRoundProgress(progress?.round ?? null);
+      setResumedStartedAt(progress?.startedAt ?? null);
 
       if (previous) {
-        setResults([]);
-        setRoundIndex(0);
         setDailyEarned([]);
         setGameStartedAt(null);
         setPendingEntry(null);
@@ -266,6 +294,8 @@ function App() {
       maybePromptNickname(newSession);
     });
     return () => subscription.subscription.unsubscribe();
+    // playOrder only changes with dateKey (Reset is disabled).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateKey]);
 
   function handleLogout() {
@@ -276,10 +306,19 @@ function App() {
   // visit), so skip straight to the results already on record instead of
   // letting the player replay.
   const isGameOver = storedRecord !== null || roundIndex >= playOrder.length;
+  const hasDailyProgress = !isGameOver && (results.length > 0 || roundProgress !== null);
+
+  // Keeps today's unfinished game saved, down to the step and tries being played, so
+  // leaving it (the logo, the menu, closing the tab) never loses or restarts a round.
+  useEffect(() => {
+    if (!hasDailyProgress) return;
+    const progress: DailyProgress = { results, round: roundProgress, startedAt: gameStartedAt ?? resumedStartedAt };
+    saveProgress('daily-progress', dateKey, progress, owner);
+  }, [hasDailyProgress, results, roundProgress, gameStartedAt, resumedStartedAt, dateKey, owner]);
 
   function handlePlay() {
-    trackGameStarted();
-    setGameStartedAt(Date.now());
+    if (!hasDailyProgress) trackGameStarted();
+    setGameStartedAt((prev) => prev ?? resumedStartedAt ?? Date.now());
     setScreen('game');
   }
 
@@ -304,6 +343,7 @@ function App() {
         totalPoints: next.reduce((sum, r) => sum + r.points, 0),
       };
       const newStreak = saveDailyCompletion(record, owner);
+      clearProgress('daily-progress', owner);
       setStreak(newStreak);
       setStoredRecord(record);
       setDailyEarned(
@@ -322,6 +362,7 @@ function App() {
       }
     }
     setResults(next);
+    setRoundProgress(null);
     setRoundIndex((prev) => prev + 1);
   }
 
@@ -429,11 +470,16 @@ function App() {
           userEmail={session?.user.email ?? null}
         />
         <div className="min-w-0 text-center">
-          <h1
-            className="truncate bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 bg-clip-text text-lg font-bold tracking-wide text-transparent sm:text-3xl md:text-3xl"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-          >
-            MapsyQuest
+          {/* Home from every screen. Leaving a game this way keeps it: it's saved as it's played. */}
+          <h1 className="truncate text-lg font-bold tracking-wide sm:text-3xl md:text-3xl">
+            <button
+              type="button"
+              onClick={() => setScreen('start')}
+              className="max-w-full cursor-pointer truncate bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 bg-clip-text text-transparent"
+              style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+            >
+              MapsyQuest
+            </button>
           </h1>
         </div>
         {displayName && session && (
@@ -478,6 +524,7 @@ function App() {
           <StartScreen
             totalRounds={playOrder.length}
             isLocked={isGameOver}
+            resumeRound={hasDailyProgress ? roundIndex + 1 : null}
             totalStars={totalStars}
             totalPoints={totalPoints}
             streak={streak}
@@ -533,6 +580,8 @@ function App() {
             country={playOrder[roundIndex]}
             roundNumber={roundIndex + 1}
             totalRounds={playOrder.length}
+            saved={roundProgress}
+            onProgress={setRoundProgress}
             onRoundComplete={handleRoundComplete}
           />
         )}

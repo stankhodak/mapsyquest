@@ -6,25 +6,38 @@ import {
   formatChallengeTime,
   timePenaltySeconds,
   wrongGuessesForTier,
-  type ChallengeKind,
-  type RegionId,
+  type ChallengeSetup,
 } from '../lib/challenges';
 import { todayKey } from '../lib/daily';
 import { buildGameSummary, countryRoundSummary, fullRoundSummary } from '../lib/gameSummaries';
 import { buildEntry, type BoardEntry } from '../lib/leaderboard';
 import { recordCompletedGame } from '../lib/playerStats';
 import { tierIcon } from '../lib/points';
+import { clearProgress, saveProgress } from '../lib/storage';
 import { ChallengeResults, type RoundOutcome } from './ChallengeResults';
-import { CountryStep, type CountryGuessResult } from './CountryStep';
+import { CountryStep, type CountryGuessResult, type CountryStepState } from './CountryStep';
 import type { LeaderboardAccount } from './LeaderboardOffer';
-import { RoundFlow, type RoundResult } from './RoundFlow';
+import { RoundFlow, type RoundProgress, type RoundResult } from './RoundFlow';
+
+/** An unfinished challenge, saved so it resumes (the same day) after the player leaves it. */
+export interface ChallengeProgress {
+  setup: ChallengeSetup;
+  countryIds: string[];
+  records: OutcomeRecord[];
+  /** When the game began; the Time Challenge clock keeps running while the game is left. */
+  startedAt: number;
+  /** The Full Round being played, part-way. */
+  round: RoundProgress | null;
+  /** The country step being played, part-way (every other kind). */
+  countryStep: CountryStepState | null;
+}
 
 interface ChallengeGameProps {
-  kind: ChallengeKind;
-  /** Set for the two regional kinds. */
-  region?: RegionId;
+  setup: ChallengeSetup;
   title: string;
   countries: Country[];
+  /** Where to resume from, if the game was left part-way. */
+  saved?: ChallengeProgress | null;
   account: LeaderboardAccount | null;
   onLogin: () => void;
   onViewBoard: (board: string) => void;
@@ -67,18 +80,23 @@ function Stopwatch({
 }
 
 export function ChallengeGame({
-  kind,
-  region,
+  setup,
   title,
   countries,
+  saved = null,
   account,
   onLogin,
   onViewBoard,
   onPlayAgain,
   onExit,
 }: ChallengeGameProps) {
-  const [records, setRecords] = useState<OutcomeRecord[]>([]);
-  const [startedAt] = useState(() => Date.now());
+  const { kind, region } = setup;
+  const owner = account?.userId ?? null;
+  const [dateKey] = useState(() => todayKey());
+  const [records, setRecords] = useState<OutcomeRecord[]>(() => saved?.records ?? []);
+  const [startedAt] = useState(() => saved?.startedAt ?? Date.now());
+  const [round, setRound] = useState<RoundProgress | null>(() => saved?.round ?? null);
+  const [countryStep, setCountryStep] = useState<CountryStepState | null>(() => saved?.countryStep ?? null);
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
   const [earned, setEarned] = useState<EarnedAchievement[]>([]);
   const [entry, setEntry] = useState<BoardEntry | null>(null);
@@ -88,13 +106,33 @@ export function ChallengeGame({
   const penaltyOf = (rs: OutcomeRecord[]) => timePenaltySeconds(rs.reduce((sum, r) => sum + r.wrongGuesses, 0));
   const penaltySeconds = penaltyOf(records);
   // Wrong guesses on the country being played, charged on the clock straight away instead of when it ends.
-  const [liveWrongGuesses, setLiveWrongGuesses] = useState(0);
+  const liveWrongGuesses = countryStep?.wrongGuesses ?? 0;
+
+  useEffect(() => {
+    if (finishedAt !== null) return;
+    const progress: ChallengeProgress = {
+      setup,
+      countryIds: countries.map((c) => c.id),
+      records,
+      startedAt,
+      round,
+      countryStep,
+    };
+    saveProgress('challenge-progress', dateKey, progress, owner);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [records, round, countryStep, finishedAt]);
 
   function record(outcome: OutcomeRecord) {
     const next = [...records, outcome];
     setRecords(next);
-    setLiveWrongGuesses(0);
+    setRound(null);
+    setCountryStep(null);
     if (next.length === totalRounds) finishGame(next);
+  }
+
+  function quit() {
+    clearProgress('challenge-progress', owner);
+    onExit();
   }
 
   /**
@@ -103,6 +141,7 @@ export function ChallengeGame({
    */
   function finishGame(all: OutcomeRecord[]) {
     const now = Date.now();
+    clearProgress('challenge-progress', owner);
     const penalty = penaltyOf(all);
     const game = buildGameSummary({
       kind,
@@ -196,7 +235,7 @@ export function ChallengeGame({
   return (
     <div className="mx-auto w-full max-w-md space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={onExit} className="shrink-0 text-sm text-slate-400 underline hover:text-slate-200">
+        <button type="button" onClick={quit} className="shrink-0 text-sm text-slate-400 underline hover:text-slate-200">
           ← Quit
         </button>
         <span className="min-w-0 truncate text-sm font-semibold text-slate-300">{title}</span>
@@ -216,6 +255,8 @@ export function ChallengeGame({
           country={country}
           roundNumber={index + 1}
           totalRounds={totalRounds}
+          saved={round}
+          onProgress={setRound}
           onRoundComplete={(result) => handleFullRound(country, result)}
         />
       ) : (
@@ -225,7 +266,8 @@ export function ChallengeGame({
           roundNumber={index + 1}
           totalRounds={totalRounds}
           clue={kind === 'flag' ? 'flag' : 'map'}
-          onWrongGuess={() => setLiveWrongGuesses((n) => n + 1)}
+          saved={countryStep}
+          onStateChange={setCountryStep}
           onComplete={(result) => handleGuess(country, result)}
         />
       )}

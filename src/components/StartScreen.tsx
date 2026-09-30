@@ -6,6 +6,8 @@ import { MapScope } from './MapScope';
 interface StartScreenProps {
   totalRounds: number;
   isLocked: boolean;
+  /** The round today's game was left on, when it's been started but not finished. */
+  resumeRound: number | null;
   totalStars: number;
   totalPoints: number;
   streak: StreakState;
@@ -44,6 +46,7 @@ const CATEGORY_PILLS = [
 export function StartScreen({
   totalRounds,
   isLocked,
+  resumeRound,
   totalStars,
   totalPoints,
   streak,
@@ -101,7 +104,7 @@ export function StartScreen({
           onClick={onPlay}
           className="w-full rounded-xl bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-400 px-6 py-3 text-lg font-bold text-slate-950 shadow-lg transition hover:scale-[1.02] hover:shadow-emerald-500/20 active:scale-[0.98]"
         >
-          Play today's challenge
+          {resumeRound !== null ? `Continue · round ${resumeRound} of ${totalRounds}` : "Play today's challenge"}
         </button>
       )}
 

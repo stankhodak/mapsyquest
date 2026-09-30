@@ -124,6 +124,39 @@ export function saveDailyCompletion(record: StoredDailyRecord, owner: StorageOwn
   return next;
 }
 
+/** Which unfinished game a saved progress entry belongs to. */
+export type ProgressSlot = 'daily-progress' | 'challenge-progress';
+
+interface StoredProgress<T> {
+  date: string;
+  value: T;
+}
+
+/**
+ * Saves an unfinished game so it resumes after the tab is closed or the player leaves
+ * it. Stamped with the day it was played: it only resumes on that same day.
+ */
+export function saveProgress<T>(slot: ProgressSlot, dateKey: string, value: T, owner: StorageOwner = null): void {
+  const stored: StoredProgress<T> = { date: dateKey, value };
+  safeSetItem(scopedKey(slot, owner), JSON.stringify(stored));
+}
+
+/** The game saved in `slot` today, or null when there's none or it was saved on an earlier day. */
+export function loadProgress<T>(slot: ProgressSlot, dateKey: string, owner: StorageOwner = null): T | null {
+  const raw = safeGetItem(scopedKey(slot, owner));
+  if (!raw) return null;
+  try {
+    const stored = JSON.parse(raw) as StoredProgress<T>;
+    return stored.date === dateKey ? stored.value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearProgress(slot: ProgressSlot, owner: StorageOwner = null): void {
+  safeRemoveItem(scopedKey(slot, owner));
+}
+
 /**
  * Hands what a guest saved on this device to the account that has just logged in, so a
  * game finished before logging in still counts (and can still be posted). Only fills gaps:
@@ -139,7 +172,7 @@ export function adoptGuestData(userId: string, dateKey: string): void {
     safeRemoveItem(scopedKey('streak', null));
   }
 
-  for (const name of ['streak', 'achievements']) {
+  for (const name of ['streak', 'achievements', 'daily-progress', 'challenge-progress']) {
     const guestValue = safeGetItem(scopedKey(name, null));
     if (guestValue !== null && safeGetItem(scopedKey(name, userId)) === null) {
       safeSetItem(scopedKey(name, userId), guestValue);

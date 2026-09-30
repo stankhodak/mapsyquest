@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { countries } from '../data/countries';
+import { useEffect, useState } from 'react';
+import { countries, getCountryById } from '../data/countries';
 import type { Country } from '../data/types';
 import { flagImageUrl } from '../lib/flags';
 import { MAX_SCORE, tierForTry, type StarTier } from '../lib/points';
@@ -13,11 +13,22 @@ export interface FlagGuessResult {
   tier: StarTier;
 }
 
+/** Everything needed to pick the step up again exactly where it was left. */
+export interface FlagStepState {
+  /** The shuffled options, kept so a resumed step shows the same ones in the same places. */
+  optionIds: string[];
+  /** The flag picked; set the moment it's picked, so leaving during the reveal pause still finishes the step on return. */
+  selected: string | null;
+}
+
 interface FlagStepProps {
   answer: Country;
   roundNumber: number;
   totalRounds: number;
   onComplete: (result: FlagGuessResult) => void;
+  /** Where to resume from, if the step was left part-way. */
+  saved?: FlagStepState | null;
+  onStateChange?: (state: FlagStepState) => void;
 }
 
 const OPTION_COUNT = 10;
@@ -35,29 +46,51 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-export function FlagStep({ answer, roundNumber, totalRounds, onComplete }: FlagStepProps) {
-  const [selected, setSelected] = useState<string | null>(null);
+// Distractors are plain random picks for now; the instructions doc flags
+// near-neighbour-vs-random difficulty tuning as an open decision.
+function buildOptionIds(answer: Country): string[] {
+  const distractors = shuffle(countries.filter((c) => c.id !== answer.id)).slice(0, OPTION_COUNT - 1);
+  return shuffle([...distractors, answer]).map((c) => c.id);
+}
 
-  // Distractors are plain random picks for now; the instructions doc flags
-  // near-neighbour-vs-random difficulty tuning as an open decision.
-  const options = useMemo(() => {
-    const distractors = shuffle(countries.filter((c) => c.id !== answer.id)).slice(
-      0,
-      OPTION_COUNT - 1,
-    );
-    return shuffle([...distractors, answer]);
+export function FlagStep({
+  answer,
+  roundNumber,
+  totalRounds,
+  onComplete,
+  saved = null,
+  onStateChange,
+}: FlagStepProps) {
+  const [stepState, setStepState] = useState<FlagStepState>(
+    () => saved ?? { optionIds: buildOptionIds(answer), selected: null },
+  );
+  const { selected } = stepState;
+  const options = stepState.optionIds.map(getCountryById).filter((c): c is Country => c !== undefined);
+
+  useEffect(() => {
+    onStateChange?.(stepState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answer.id]);
+  }, [stepState]);
+
+  // Advances once the answer has been revealed. Cleared on unmount, so leaving mid-pause
+  // doesn't complete a step nobody is looking at; it completes on return instead.
+  useEffect(() => {
+    if (!selected) return;
+    const isCorrect = selected === answer.id;
+    const result: FlagGuessResult = {
+      guess: selected,
+      isCorrect,
+      score: isCorrect ? MAX_SCORE.flag : 0,
+      tier: isCorrect ? tierForTry(1) : null,
+    };
+    const id = window.setTimeout(() => onComplete(result), REVEAL_DELAY_MS);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   function pick(id: string) {
     if (selected) return;
-    setSelected(id);
-    const isCorrect = id === answer.id;
-    const score = isCorrect ? MAX_SCORE.flag : 0;
-    window.setTimeout(
-      () => onComplete({ guess: id, isCorrect, score, tier: isCorrect ? tierForTry(1) : null }),
-      REVEAL_DELAY_MS,
-    );
+    setStepState((prev) => ({ ...prev, selected: id }));
   }
 
   return (

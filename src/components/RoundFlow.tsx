@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Country } from '../data/types';
 import { starMultiplier, tierIcon, type StarTier } from '../lib/points';
 import { RoundBadge } from './Badge';
-import { CapitalStep, type CapitalGuessResult } from './CapitalStep';
-import { CountryStep, type CountryGuessResult } from './CountryStep';
-import { FlagStep, type FlagGuessResult } from './FlagStep';
+import { CapitalStep, type CapitalGuessResult, type CapitalStepState } from './CapitalStep';
+import { CountryStep, type CountryGuessResult, type CountryStepState } from './CountryStep';
+import { FlagStep, type FlagGuessResult, type FlagStepState } from './FlagStep';
 
 export interface RoundTiers {
   country: StarTier;
@@ -22,34 +22,58 @@ export interface RoundResult {
   tiers: RoundTiers;
 }
 
+/**
+ * Everything needed to pick a round up again exactly where it was left: the guesses
+ * already in, plus the part-way state of the step being played. The step itself is
+ * whichever guess is still missing.
+ */
+export interface RoundProgress {
+  countryGuess: CountryGuessResult | null;
+  capitalGuess: CapitalGuessResult | null;
+  flagGuess: FlagGuessResult | null;
+  countryStep: CountryStepState | null;
+  capitalStep: CapitalStepState | null;
+  flagStep: FlagStepState | null;
+}
+
+const NEW_ROUND: RoundProgress = {
+  countryGuess: null,
+  capitalGuess: null,
+  flagGuess: null,
+  countryStep: null,
+  capitalStep: null,
+  flagStep: null,
+};
+
 interface RoundFlowProps {
   country: Country;
   roundNumber: number;
   totalRounds: number;
   onRoundComplete: (result: RoundResult) => void;
+  /** Where to resume from, if the round was left part-way. */
+  saved?: RoundProgress | null;
+  onProgress?: (progress: RoundProgress) => void;
 }
 
-type Step = 'country' | 'capital' | 'flag' | 'summary';
+export function RoundFlow({
+  country,
+  roundNumber,
+  totalRounds,
+  onRoundComplete,
+  saved = null,
+  onProgress,
+}: RoundFlowProps) {
+  const [progress, setProgress] = useState<RoundProgress>(() => saved ?? NEW_ROUND);
+  const { countryGuess, capitalGuess, flagGuess } = progress;
+  const step = !countryGuess ? 'country' : !capitalGuess ? 'capital' : !flagGuess ? 'flag' : 'summary';
 
-export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }: RoundFlowProps) {
-  const [step, setStep] = useState<Step>('country');
-  const [countryGuess, setCountryGuess] = useState<CountryGuessResult | null>(null);
-  const [capitalGuess, setCapitalGuess] = useState<CapitalGuessResult | null>(null);
-  const [flagGuess, setFlagGuess] = useState<FlagGuessResult | null>(null);
+  useEffect(() => {
+    onProgress?.(progress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress]);
 
-  function handleCountryComplete(result: CountryGuessResult) {
-    setCountryGuess(result);
-    setStep('capital');
-  }
-
-  function handleCapitalComplete(result: CapitalGuessResult) {
-    setCapitalGuess(result);
-    setStep('flag');
-  }
-
-  function handleFlagComplete(result: FlagGuessResult) {
-    setFlagGuess(result);
-    setStep('summary');
+  function update(changes: Partial<RoundProgress>) {
+    setProgress((prev) => ({ ...prev, ...changes }));
   }
 
   const allGuessesIn = countryGuess !== null && capitalGuess !== null && flagGuess !== null;
@@ -74,7 +98,9 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
           answer={country}
           roundNumber={roundNumber}
           totalRounds={totalRounds}
-          onComplete={handleCountryComplete}
+          saved={progress.countryStep}
+          onStateChange={(countryStep) => update({ countryStep })}
+          onComplete={(result) => update({ countryGuess: result, countryStep: null })}
         />
       )}
       {step === 'capital' && (
@@ -82,7 +108,9 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
           answer={country}
           roundNumber={roundNumber}
           totalRounds={totalRounds}
-          onComplete={handleCapitalComplete}
+          saved={progress.capitalStep}
+          onStateChange={(capitalStep) => update({ capitalStep })}
+          onComplete={(result) => update({ capitalGuess: result, capitalStep: null })}
         />
       )}
       {step === 'flag' && (
@@ -90,7 +118,9 @@ export function RoundFlow({ country, roundNumber, totalRounds, onRoundComplete }
           answer={country}
           roundNumber={roundNumber}
           totalRounds={totalRounds}
-          onComplete={handleFlagComplete}
+          saved={progress.flagStep}
+          onStateChange={(flagStep) => update({ flagStep })}
+          onComplete={(result) => update({ flagGuess: result, flagStep: null })}
         />
       )}
 

@@ -9,8 +9,11 @@ import {
   type ChallengeSetup,
   type RegionId,
 } from '../lib/challenges';
+import { getCountryById } from '../data/countries';
 import type { Country } from '../data/types';
-import { ChallengeGame } from './ChallengeGame';
+import { todayKey } from '../lib/daily';
+import { loadProgress } from '../lib/storage';
+import { ChallengeGame, type ChallengeProgress } from './ChallengeGame';
 import type { LeaderboardAccount } from './LeaderboardOffer';
 
 interface ChallengesHubProps {
@@ -30,6 +33,16 @@ interface ActiveGame {
   countries: Country[];
   /** Bumped on "Play again" so the game remounts even when the setup is unchanged. */
   gameId: number;
+  saved?: ChallengeProgress | null;
+}
+
+/** The challenge this player left unfinished today, with its countries looked up again. */
+function loadUnfinishedGame(owner: string | null): ActiveGame | null {
+  const saved = loadProgress<ChallengeProgress>('challenge-progress', todayKey(), owner);
+  if (!saved) return null;
+  const countries = saved.countryIds.map(getCountryById).filter((c): c is Country => c !== undefined);
+  if (countries.length !== saved.countryIds.length || saved.records.length >= countries.length) return null;
+  return { setup: saved.setup, countries, gameId: 1, saved };
 }
 
 function ChoiceButton({
@@ -73,6 +86,10 @@ export function ChallengesHub({ onBack, account, onLogin, onViewBoard, initialSe
   const [game, setGame] = useState<ActiveGame | null>(() =>
     initialSetup ? { setup: initialSetup, countries: buildChallengeCountries(initialSetup), gameId: 1 } : null,
   );
+  // Offered as "Continue" on the menu. Starting any other game replaces it.
+  const [unfinished, setUnfinished] = useState<ActiveGame | null>(() =>
+    initialSetup ? null : loadUnfinishedGame(account?.userId ?? null),
+  );
 
   function startGame(setup: ChallengeSetup, previousGameId = 0) {
     setGame({ setup, countries: buildChallengeCountries(setup), gameId: previousGameId + 1 });
@@ -82,8 +99,8 @@ export function ChallengesHub({ onBack, account, onLogin, onViewBoard, initialSe
     return (
       <ChallengeGame
         key={game.gameId}
-        kind={game.setup.kind}
-        region={game.setup.region}
+        setup={game.setup}
+        saved={game.saved}
         account={account}
         onLogin={onLogin}
         onViewBoard={onViewBoard}
@@ -92,6 +109,7 @@ export function ChallengesHub({ onBack, account, onLogin, onViewBoard, initialSe
         onPlayAgain={() => startGame(game.setup, game.gameId)}
         onExit={() => {
           setGame(null);
+          setUnfinished(null);
           setView({ name: 'menu' });
         }}
       />
@@ -106,6 +124,14 @@ export function ChallengesHub({ onBack, account, onLogin, onViewBoard, initialSe
             <h2 className="text-xl font-bold text-slate-100">More Challenges</h2>
             <p className="text-sm text-slate-400">Practice as often as you like — these don't affect your daily streak.</p>
           </div>
+          {unfinished && (
+            <ChoiceButton
+              onClick={() => setGame(unfinished)}
+              emoji="▶️"
+              title={`Continue ${challengeTitle(unfinished.setup)}`}
+              description={`Pick up where you left off — round ${unfinished.saved!.records.length + 1} of ${unfinished.countries.length}.`}
+            />
+          )}
           <ChoiceButton
             onClick={() => setView({ name: 'regions' })}
             emoji="🌍"

@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   adoptGuestData,
+  clearProgress,
   loadDailyRecord,
+  loadProgress,
   loadStreak,
   saveDailyCompletion,
+  saveProgress,
   scopedKey,
   type StoredDailyRecord,
 } from '../storage';
@@ -96,5 +99,49 @@ describe('adoptGuestData', () => {
 
     expect(loadDailyRecord(TODAY, 'account-a')).toBeNull();
     expect(loadStreak('account-a').currentStreak).toBe(0);
+  });
+});
+
+describe('unfinished game progress', () => {
+  it('resumes a game saved earlier the same day', () => {
+    saveProgress('daily-progress', TODAY, { round: 3 }, null);
+
+    expect(loadProgress('daily-progress', TODAY, null)).toEqual({ round: 3 });
+  });
+
+  it("doesn't resume a game saved on an earlier day", () => {
+    saveProgress('daily-progress', YESTERDAY, { round: 3 }, null);
+
+    expect(loadProgress('daily-progress', TODAY, null)).toBeNull();
+  });
+
+  it('keeps the daily game and a challenge apart, and each account to itself', () => {
+    saveProgress('daily-progress', TODAY, { round: 3 }, 'account-a');
+    saveProgress('challenge-progress', TODAY, { round: 7 }, 'account-a');
+
+    expect(loadProgress('daily-progress', TODAY, 'account-a')).toEqual({ round: 3 });
+    expect(loadProgress('challenge-progress', TODAY, 'account-a')).toEqual({ round: 7 });
+    expect(loadProgress('daily-progress', TODAY, 'account-b')).toBeNull();
+    expect(loadProgress('daily-progress', TODAY, null)).toBeNull();
+  });
+
+  it('is gone once cleared', () => {
+    saveProgress('challenge-progress', TODAY, { round: 7 }, null);
+
+    clearProgress('challenge-progress', null);
+
+    expect(loadProgress('challenge-progress', TODAY, null)).toBeNull();
+  });
+
+  it("hands a guest's unfinished game to the account that logs in, unless it has its own", () => {
+    saveProgress('daily-progress', TODAY, { round: 2 }, null);
+    saveProgress('challenge-progress', TODAY, { round: 5 }, null);
+    saveProgress('challenge-progress', TODAY, { round: 9 }, 'account-a');
+
+    adoptGuestData('account-a', TODAY);
+
+    expect(loadProgress('daily-progress', TODAY, 'account-a')).toEqual({ round: 2 });
+    expect(loadProgress('daily-progress', TODAY, null)).toBeNull();
+    expect(loadProgress('challenge-progress', TODAY, 'account-a')).toEqual({ round: 9 });
   });
 });

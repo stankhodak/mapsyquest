@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { countries } from '../data/countries';
+import { useEffect, useState } from 'react';
+import { countries, getCountryById } from '../data/countries';
 import type { Country } from '../data/types';
 import { MAX_SCORE, tierForTry, TRIES_PER_CATEGORY, tryFraction, type StarTier } from '../lib/points';
 import { AttemptBadge, RoundBadge } from './Badge';
@@ -12,11 +12,23 @@ export interface CapitalGuessResult {
   tier: StarTier;
 }
 
+/** Everything needed to pick the step up again exactly where it was left. */
+export interface CapitalStepState {
+  /** The shuffled options, kept so a resumed step shows the same ones in the same places. */
+  optionIds: string[];
+  wrongIds: string[];
+  /** Set the moment the step is decided, so leaving during the reveal pause still finishes it on return. */
+  result: CapitalGuessResult | null;
+}
+
 interface CapitalStepProps {
   answer: Country;
   roundNumber: number;
   totalRounds: number;
   onComplete: (result: CapitalGuessResult) => void;
+  /** Where to resume from, if the step was left part-way. */
+  saved?: CapitalStepState | null;
+  onStateChange?: (state: CapitalStepState) => void;
 }
 
 const MAX_TRIES = TRIES_PER_CATEGORY.capital;
@@ -34,51 +46,65 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-export function CapitalStep({ answer, roundNumber, totalRounds, onComplete }: CapitalStepProps) {
-  const [tryNumber, setTryNumber] = useState(1);
-  const [wrongIds, setWrongIds] = useState<string[]>([]);
-  const [resolved, setResolved] = useState(false);
-  const [locked, setLocked] = useState(false);
+// Distractors favour the answer's own region (same-region capitals are a more
+// plausible/harder mix), topped up with capitals from elsewhere if the region
+// doesn't have enough other countries (e.g. Oceania).
+function buildOptionIds(answer: Country): string[] {
+  const rest = countries.filter((c) => c.id !== answer.id);
+  const sameRegion = shuffle(rest.filter((c) => c.region === answer.region));
+  const otherRegion = shuffle(rest.filter((c) => c.region !== answer.region));
+  const distractors = [...sameRegion, ...otherRegion].slice(0, OPTION_COUNT - 1);
+  return shuffle([...distractors, answer]).map((c) => c.id);
+}
 
-  // Distractors favour the answer's own region (same-region capitals are a more
-  // plausible/harder mix), topped up with capitals from elsewhere if the region
-  // doesn't have enough other countries (e.g. Oceania).
-  const options = useMemo(() => {
-    const rest = countries.filter((c) => c.id !== answer.id);
-    const sameRegion = shuffle(rest.filter((c) => c.region === answer.region));
-    const otherRegion = shuffle(rest.filter((c) => c.region !== answer.region));
-    const distractors = [...sameRegion, ...otherRegion].slice(0, OPTION_COUNT - 1);
-    return shuffle([...distractors, answer]);
+export function CapitalStep({
+  answer,
+  roundNumber,
+  totalRounds,
+  onComplete,
+  saved = null,
+  onStateChange,
+}: CapitalStepProps) {
+  const [stepState, setStepState] = useState<CapitalStepState>(
+    () => saved ?? { optionIds: buildOptionIds(answer), wrongIds: [], result: null },
+  );
+  const { wrongIds } = stepState;
+  const resolved = stepState.result !== null;
+  const tryNumber = Math.min(wrongIds.length + 1, MAX_TRIES);
+  const options = stepState.optionIds.map(getCountryById).filter((c): c is Country => c !== undefined);
+
+  useEffect(() => {
+    onStateChange?.(stepState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answer.id]);
+  }, [stepState]);
+
+  // Advances once the answer has been revealed. Cleared on unmount, so leaving mid-pause
+  // doesn't complete a step nobody is looking at; it completes on return instead.
+  useEffect(() => {
+    const result = stepState.result;
+    if (!result) return;
+    const id = window.setTimeout(() => onComplete(result), REVEAL_DELAY_MS);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepState.result]);
 
   function pick(option: Country) {
-    if (locked || wrongIds.includes(option.id)) return;
+    if (resolved || wrongIds.includes(option.id)) return;
 
     if (option.id === answer.id) {
-      setLocked(true);
-      setResolved(true);
       const score = Math.round(MAX_SCORE.capital * tryFraction(tryNumber));
-      window.setTimeout(
-        () => onComplete({ guess: option.capital, score, isStar: true, tier: tierForTry(tryNumber) }),
-        REVEAL_DELAY_MS,
-      );
+      setStepState((prev) => ({
+        ...prev,
+        result: { guess: option.capital, score, isStar: true, tier: tierForTry(tryNumber) },
+      }));
       return;
     }
 
-    if (tryNumber >= MAX_TRIES) {
-      setLocked(true);
-      setResolved(true);
-      setWrongIds((prev) => [...prev, option.id]);
-      window.setTimeout(
-        () => onComplete({ guess: option.capital, score: 0, isStar: false, tier: null }),
-        REVEAL_DELAY_MS,
-      );
-      return;
-    }
-
-    setWrongIds((prev) => [...prev, option.id]);
-    setTryNumber((t) => t + 1);
+    setStepState((prev) => ({
+      ...prev,
+      wrongIds: [...prev.wrongIds, option.id],
+      result: tryNumber >= MAX_TRIES ? { guess: option.capital, score: 0, isStar: false, tier: null } : null,
+    }));
   }
 
   // Skip removed for now — uncomment this function and the button below to restore it.
