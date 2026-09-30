@@ -52,6 +52,7 @@ export function CountryStep({
   const [correctFlashSignal, setCorrectFlashSignal] = useState(0);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [showPickHint, setShowPickHint] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Hard rule: never autofocus on mobile. Focusing an input there pops the keyboard
@@ -71,10 +72,18 @@ export function CountryStep({
           .filter((c) => normaliseCapital(c.name).includes(normaliseCapital(trimmed)))
           .slice(0, MAX_SUGGESTIONS)
       : [];
+  // Only real country names count as guesses: free text that doesn't exactly match one
+  // (typos, partial names) is refused without using up a try.
+  const typedCountry = findCountry(trimmed);
 
   function submit(name: string) {
-    if (!name.trim() || locked) return;
-    const isCorrect = normaliseCapital(name) === normaliseCapital(answer.name);
+    if (locked) return;
+    const guessedCountry = findCountry(name);
+    if (!guessedCountry) {
+      if (name.trim()) setShowPickHint(true);
+      return;
+    }
+    const isCorrect = guessedCountry.id === answer.id;
     setLocked(true);
 
     if (isCorrect) {
@@ -88,10 +97,8 @@ export function CountryStep({
       return;
     }
 
-    // Flash the actual (wrong) guessed country's outline in red, if it matched a real
-    // country — no map flash for unrecognised text (typos/gibberish), per design.
-    const guessedCountry = countries.find((c) => normaliseCapital(c.name) === normaliseCapital(name));
-    setFlashGuessId(guessedCountry?.id ?? null);
+    // Flash the actual (wrong) guessed country's outline in red.
+    setFlashGuessId(guessedCountry.id);
     setFlashSignal((s) => s + 1);
     setFeedback({ tone: 'wrong', label: 'Nope!' });
     onWrongGuess?.();
@@ -178,6 +185,7 @@ export function CountryStep({
           data-1p-ignore="true"
           onChange={(e) => {
             setQuery(e.target.value);
+            setShowPickHint(false);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit(query);
@@ -201,6 +209,9 @@ export function CountryStep({
           </ul>
         )}
       </div>
+      {showPickHint && !locked && matches.length === 0 && (
+        <p className="text-xs text-amber-400">Pick a country from the list</p>
+      )}
       <div className="flex items-center gap-2">
         {feedback && (
           <div className="shrink-0 md:hidden">
@@ -210,7 +221,7 @@ export function CountryStep({
         <button
           type="button"
           onClick={() => submit(query)}
-          disabled={!trimmed || locked}
+          disabled={!typedCountry || locked}
           className="flex-1 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
         >
           Guess
@@ -226,4 +237,10 @@ export function CountryStep({
       </div>
     </div>
   );
+}
+
+function findCountry(name: string): Country | undefined {
+  const normalised = normaliseCapital(name);
+  if (!normalised) return undefined;
+  return countries.find((c) => normaliseCapital(c.name) === normalised);
 }
