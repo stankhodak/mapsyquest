@@ -199,6 +199,63 @@ export async function generateReportMessage(title: string, range: DateRange): Pr
   return buildReportMessage(title, counts, duration);
 }
 
+export interface HitSummary {
+  today: number;
+  yesterday: number;
+  last7Days: number;
+  allTime: number;
+}
+
+/** Reads the anonymous per-day visit counter (supabase/site_hits.sql). Uses the service-role
+ * key because the summary function is deliberately not callable with the public anon key.
+ * Throws on failure, same rule as runHogQLQuery about not leaking the raw error. */
+export async function fetchHitSummary(): Promise<HitSummary> {
+  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    throw new Error('Supabase is not configured (missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)');
+  }
+
+  const response = await fetch(`${url}/rest/v1/rpc/mapsyquest_hit_summary`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      'content-type': 'application/json',
+    },
+    body: '{}',
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '<unreadable response body>');
+    console.error('[analytics][supabase] hit summary rejected', { status: response.status, body });
+    throw new Error(`Supabase hit summary failed with status ${response.status}`);
+  }
+
+  const rows = (await response.json()) as Array<Record<string, unknown>>;
+  const row = rows[0];
+  if (!row) throw new Error('Supabase hit summary returned no rows');
+  return {
+    today: Number(row.today),
+    yesterday: Number(row.yesterday),
+    last7Days: Number(row.last_7_days),
+    allTime: Number(row.all_time),
+  };
+}
+
+export function buildVisitsMessage(hits: HitSummary): string {
+  return [
+    'MapsyQuest — Site visits',
+    '',
+    `Today: ${hits.today}`,
+    `Yesterday: ${hits.yesterday}`,
+    `Last 7 days: ${hits.last7Days}`,
+    `All time: ${hits.allTime}`,
+    '',
+    'Page loads, not unique people. Counted for everyone, no cookies.',
+  ].join('\n');
+}
+
 /** Throws on failure — callers must not leak the raw error to clients, since Telegram's
  * response can echo back the bot token's associated chat/message details. */
 export async function sendTelegramMessage(text: string): Promise<void> {
