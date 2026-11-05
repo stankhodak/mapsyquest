@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
+  buildVisitsMessage,
+  fetchHitSummary,
   generateReportMessage,
   last7DaysRange,
   safeCompare,
@@ -27,6 +29,7 @@ const HELP_TEXT = [
   "/today — today's activity",
   '/yesterday — yesterday\'s activity',
   '/week — last 7 days',
+  '/visits — site visits: today, yesterday, last 7 days, all time',
   '/help — commands',
 ].join('\n');
 
@@ -102,6 +105,8 @@ export default async function handler(req: VercelLikeRequest, res: ServerRespons
       await sendTelegramMessage(await generateReportMessage('Yesterday', yesterdayRange()));
     } else if (command === '/week') {
       await sendTelegramMessage(await generateReportMessage('Last 7 days', last7DaysRange()));
+    } else if (command === '/visits') {
+      await sendTelegramMessage(buildVisitsMessage(await fetchHitSummary()));
     } else {
       // '/help' and any unrecognized command both get the same help text.
       await sendTelegramMessage(HELP_TEXT);

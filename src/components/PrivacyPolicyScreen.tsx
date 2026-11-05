@@ -214,7 +214,8 @@ export function PrivacyPolicyScreen({ onBack, cookiePreferences, onSaveCookiePre
               information about how the game is accessed and used — device, browser, general location (typically
               country-level), pages viewed, and which features get used. Collected via Vercel Web Analytics
               (cookieless, always on) and PostHog (hosted in the EU, uses a cookie — only runs if you turn the
-              Analytics category on, see "Cookies" above).
+              Analytics category on, see "Cookies" above). We also keep a plain daily count of page loads, stored
+              in Supabase as nothing but a number per day — no cookie, and nothing that identifies you.
             </>,
           ]}
         />
@@ -241,8 +242,8 @@ export function PrivacyPolicyScreen({ onBack, cookiePreferences, onSaveCookiePre
         <BulletList
           items={[
             <>
-              <span className="font-semibold text-slate-200">Supabase</span> — authentication and account
-              storage.
+              <span className="font-semibold text-slate-200">Supabase</span> — authentication, account
+              storage and the anonymous daily visit count.
             </>,
             <>
               <span className="font-semibold text-slate-200">Google</span> — only if you sign in with Google;
