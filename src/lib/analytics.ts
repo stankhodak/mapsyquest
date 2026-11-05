@@ -12,11 +12,20 @@ function sendEvent(name: string, properties?: Record<string, number>): void {
   if (isPostHogTracking()) posthog.capture(name, properties);
 }
 
-/** Fired once per browser per day (the day-lock prevents replay), so this event's daily
- * count is a reasonable stand-in for "unique players per day" — how many visitors
- * actually start playing, not just land on the page. */
+/** Fired once per daily game, when Play starts it fresh (not when resuming it). If analytics
+ * cookies aren't accepted yet only Vercel counts it, and trackLateGameStart may send
+ * PostHog's copy later. */
 export function trackGameStarted(): void {
   sendEvent('game_started');
+}
+
+/** PostHog's copy of a game_started that Vercel already counted while PostHog wasn't
+ * allowed to capture — sent once the player accepts analytics part-way through (or comes
+ * back to) that same game, so its rounds and completion aren't left without a start.
+ * Timestamped at the original start, and tagged afterConsent so it can be told apart. */
+export function trackLateGameStart(startedAt: number): void {
+  if (!isPostHogTracking()) return;
+  posthog.capture('game_started', { afterConsent: 1 }, { timestamp: new Date(startedAt) });
 }
 
 /** Fired every time a round finishes (win or skip), so the per-round counts show where in
@@ -38,8 +47,45 @@ export function trackGameAbandoned(atRound: number): void {
   sendEvent('game_abandoned', { atRound });
 }
 
-/** Fired alongside game_completed with the wall-clock time (in seconds) from pressing
- * Play to finishing the last round. */
+/** Fired alongside game_completed with the wall-clock time (in seconds) from first pressing
+ * Play to finishing the last round. A resumed game keeps its original start, so this
+ * includes any time spent away from the game (other screens, a closed tab) — it is elapsed
+ * time, not active playing time. */
 export function trackGameDuration(seconds: number): void {
   sendEvent('game_duration', { seconds });
+}
+
+/** What pressing Play should report: 'new' for a fresh game (game_started to Vercel, and to
+ * PostHog if it's capturing), 'late' for a resumed game whose start PostHog never got and now
+ * can (trackLateGameStart), or null. `startTracked` is the updated "PostHog has this game's
+ * start" flag to keep with the game's saved progress. */
+export function gameStartOnPlay(state: {
+  hasDailyProgress: boolean;
+  startTracked: boolean;
+  posthogTracking: boolean;
+}): { report: 'new' | 'late' | null; startTracked: boolean } {
+  if (!state.hasDailyProgress) return { report: 'new', startTracked: state.posthogTracking };
+  if (state.posthogTracking && !state.startTracked) return { report: 'late', startTracked: true };
+  return { report: null, startTracked: state.startTracked };
+}
+
+/** When the player turns analytics on: a game being played right now whose start PostHog
+ * missed gets its late start; anything else waits for Play (gameStartOnPlay). */
+export function gameStartOnConsent(state: {
+  playing: boolean;
+  startTracked: boolean;
+}): { report: 'late' | null; startTracked: boolean } {
+  if (state.playing && !state.startTracked) return { report: 'late', startTracked: true };
+  return { report: null, startTracked: state.startTracked };
+}
+
+/** Whether leaving the page now counts as abandoning the daily game: Play was pressed this
+ * visit and not every round is done yet. */
+export function isGameAbandonedOnLeave(gameStartedAt: number | null, roundIndex: number, totalRounds: number): boolean {
+  return gameStartedAt !== null && roundIndex < totalRounds;
+}
+
+/** Whole seconds from the game's first Play to now, never negative (a clock moved back). */
+export function elapsedGameSeconds(startedAt: number, finishedAt: number): number {
+  return Math.max(0, Math.round((finishedAt - startedAt) / 1000));
 }

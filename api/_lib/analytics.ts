@@ -17,6 +17,8 @@ export interface CountsRow {
 export interface DurationRow {
   avgSeconds: number | null;
   medianSeconds: number | null;
+  /** How many game_duration events the average/median are over. */
+  games: number;
 }
 
 export interface DateRange {
@@ -78,7 +80,7 @@ export function last7DaysRange(): DateRange {
   return { startDateKey: shiftDateKey(today, -6), endDateKey: today };
 }
 
-function dateRangeFilter(range: DateRange): string {
+export function dateRangeFilter(range: DateRange): string {
   const bucket = `toDate(toTimeZone(timestamp, '${REPORT_TIMEZONE}'))`;
   return `${bucket} >= toDate('${range.startDateKey}') AND ${bucket} <= toDate('${range.endDateKey}')`;
 }
@@ -121,20 +123,25 @@ async function runHogQLQuery(query: string, label: string): Promise<unknown[]> {
   return row;
 }
 
-export async function fetchCounts(range: DateRange): Promise<CountsRow> {
-  const row = await runHogQLQuery(
-    `
+/** Players are everyone with any game event in the range, not just those with a
+ * game_started there: a start can fall outside it (or, before late starts existed, be
+ * missing from PostHog entirely when the game began before analytics consent), and counting
+ * only starters reported 0 players next to completed games. */
+export function countsQuery(range: DateRange): string {
+  return `
     SELECT
-      uniqIf(distinct_id, event = 'game_started') AS players,
+      uniq(distinct_id) AS players,
       countIf(event = 'game_started') AS games_started,
       countIf(event = 'game_completed') AS games_completed,
       countIf(event = 'round_completed') AS rounds_completed
     FROM events
     WHERE event IN ('game_started', 'game_completed', 'round_completed')
       AND ${dateRangeFilter(range)}
-  `,
-    'counts',
-  );
+  `;
+}
+
+export async function fetchCounts(range: DateRange): Promise<CountsRow> {
+  const row = await runHogQLQuery(countsQuery(range), 'counts');
 
   return {
     players: Number(row[0]),
@@ -144,22 +151,25 @@ export async function fetchCounts(range: DateRange): Promise<CountsRow> {
   };
 }
 
-export async function fetchDurationStats(range: DateRange): Promise<DurationRow> {
-  const row = await runHogQLQuery(
-    `
+export function durationQuery(range: DateRange): string {
+  return `
     SELECT
       avg(toFloat64OrNull(properties.seconds)) AS avg_seconds,
-      quantile(0.5)(toFloat64OrNull(properties.seconds)) AS median_seconds
+      quantile(0.5)(toFloat64OrNull(properties.seconds)) AS median_seconds,
+      count() AS games
     FROM events
     WHERE event = 'game_duration'
       AND ${dateRangeFilter(range)}
-  `,
-    'duration',
-  );
+  `;
+}
+
+export async function fetchDurationStats(range: DateRange): Promise<DurationRow> {
+  const row = await runHogQLQuery(durationQuery(range), 'duration');
 
   return {
     avgSeconds: row[0] === null ? null : Number(row[0]),
     medianSeconds: row[1] === null ? null : Number(row[1]),
+    games: Number(row[2] ?? 0),
   };
 }
 
@@ -185,12 +195,19 @@ export function buildReportMessage(title: string, counts: CountsRow, duration: D
   if (completionRate !== null) {
     lines.push(`Completion rate: ${completionRate}%`);
   }
+  // game_duration is wall-clock time from first pressing Play to the last round, so a game
+  // left and resumed later includes the time away: "time to finish", not time spent playing.
   if (duration.avgSeconds !== null) {
-    lines.push(`Avg game duration: ${formatDuration(duration.avgSeconds)}`);
+    lines.push(`Avg time to finish: ${formatDuration(duration.avgSeconds)}`);
   }
   if (duration.medianSeconds !== null) {
-    lines.push(`Median game duration: ${formatDuration(duration.medianSeconds)}`);
+    lines.push(`Median time to finish: ${formatDuration(duration.medianSeconds)}`);
   }
+  if (duration.avgSeconds !== null || duration.medianSeconds !== null) {
+    const games = `${duration.games} ${duration.games === 1 ? 'game' : 'games'}`;
+    lines.push(`(first Play to last round, incl. time away; ${games})`);
+  }
+  lines.push('', 'PostHog only: visitors who accepted analytics cookies. /visits counts all page loads.');
   return lines.join('\n');
 }
 

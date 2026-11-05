@@ -1,10 +1,15 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useRef, useState } from 'react';
 import {
+  elapsedGameSeconds,
+  gameStartOnConsent,
+  gameStartOnPlay,
+  isGameAbandonedOnLeave,
   trackGameAbandoned,
   trackGameCompleted,
   trackGameDuration,
   trackGameStarted,
+  trackLateGameStart,
   trackRoundCompleted,
 } from './lib/analytics';
 import { AccountBadge } from './components/AccountBadge';
@@ -44,7 +49,7 @@ import {
   type BoardEntry,
 } from './lib/leaderboard';
 import { buildGameSummary, fullRoundSummary } from './lib/gameSummaries';
-import { disablePostHogTracking, enablePostHogTracking } from './lib/posthogClient';
+import { disablePostHogTracking, enablePostHogTracking, isPostHogTracking } from './lib/posthogClient';
 import { recordCompletedGame } from './lib/playerStats';
 import { tierIcon } from './lib/points';
 import {
@@ -99,6 +104,10 @@ interface DailyProgress {
   /** The round being played, part-way. */
   round: RoundProgress | null;
   startedAt: number | null;
+  /** Whether PostHog has this game's game_started (false when it began before analytics
+   * consent). Missing from games saved before it existed: treated as true, so they never
+   * get a second start. */
+  startTracked?: boolean;
 }
 
 /** The daily game this player left unfinished today, if it still lines up with today's countries. */
@@ -180,6 +189,8 @@ function App() {
   const [gameStartedAt, setGameStartedAt] = useState<number | null>(null);
   // When a resumed game was first started, so its duration still counts from then.
   const [resumedStartedAt, setResumedStartedAt] = useState<number | null>(() => savedDaily?.startedAt ?? null);
+  // See DailyProgress.startTracked.
+  const [startTracked, setStartTracked] = useState(() => savedDaily?.startTracked ?? true);
   // Null until the player has chosen (or chosen again from the Privacy Policy screen) —
   // the banner shows only then. See lib/cookieConsent.ts and lib/posthogClient.ts.
   const [cookiePreferences, setCookiePreferences] = useState<CookiePreferences | null>(() => loadCookiePreferences());
@@ -187,8 +198,15 @@ function App() {
   function applyCookiePreferences(prefs: CookiePreferences) {
     saveCookiePreferences(prefs);
     setCookiePreferences(prefs);
-    if (prefs.analytics) enablePostHogTracking();
-    else disablePostHogTracking();
+    if (prefs.analytics) {
+      enablePostHogTracking();
+      // Accepted part-way through a game started before consent: PostHog gets its start now.
+      const start = gameStartOnConsent({ playing: gameStartedAt !== null && !isGameOver, startTracked });
+      if (start.report === 'late' && gameStartedAt !== null && isPostHogTracking()) {
+        trackLateGameStart(gameStartedAt);
+        setStartTracked(start.startTracked);
+      }
+    } else disablePostHogTracking();
   }
 
   useEffect(() => {
@@ -202,7 +220,7 @@ function App() {
   // doesn't block the page from entering the back/forward cache.
   useEffect(() => {
     function handlePageHide() {
-      if (gameStartedAt !== null && roundIndex < playOrder.length) {
+      if (isGameAbandonedOnLeave(gameStartedAt, roundIndex, playOrder.length)) {
         trackGameAbandoned(roundIndex + 1);
       }
     }
@@ -269,6 +287,7 @@ function App() {
       setRoundIndex(progress?.results.length ?? 0);
       setRoundProgress(progress?.round ?? null);
       setResumedStartedAt(progress?.startedAt ?? null);
+      setStartTracked(progress?.startTracked ?? true);
 
       if (previous) {
         setDailyEarned([]);
@@ -312,13 +331,24 @@ function App() {
   // leaving it (the logo, the menu, closing the tab) never loses or restarts a round.
   useEffect(() => {
     if (!hasDailyProgress) return;
-    const progress: DailyProgress = { results, round: roundProgress, startedAt: gameStartedAt ?? resumedStartedAt };
+    const progress: DailyProgress = {
+      results,
+      round: roundProgress,
+      startedAt: gameStartedAt ?? resumedStartedAt,
+      startTracked,
+    };
     saveProgress('daily-progress', dateKey, progress, owner);
-  }, [hasDailyProgress, results, roundProgress, gameStartedAt, resumedStartedAt, dateKey, owner]);
+  }, [hasDailyProgress, results, roundProgress, gameStartedAt, resumedStartedAt, startTracked, dateKey, owner]);
 
   function handlePlay() {
-    if (!hasDailyProgress) trackGameStarted();
-    setGameStartedAt((prev) => prev ?? resumedStartedAt ?? Date.now());
+    const startedAt = gameStartedAt ?? resumedStartedAt ?? Date.now();
+    // A fresh game counts its start once; resuming doesn't count it again, except to give
+    // PostHog the start it missed when the game began before analytics consent.
+    const start = gameStartOnPlay({ hasDailyProgress, startTracked, posthogTracking: isPostHogTracking() });
+    if (start.report === 'new') trackGameStarted();
+    else if (start.report === 'late') trackLateGameStart(startedAt);
+    setStartTracked(start.startTracked);
+    setGameStartedAt(startedAt);
     setScreen('game');
   }
 
@@ -355,7 +385,7 @@ function App() {
       );
       trackGameCompleted(record.totalStars, record.totalPoints, playOrder.length);
       if (gameStartedAt !== null) {
-        trackGameDuration(Math.round((Date.now() - gameStartedAt) / 1000));
+        trackGameDuration(elapsedGameSeconds(gameStartedAt, Date.now()));
       }
       if (session) {
         recordCompletedGame(session.user.id, record.totalStars, record.totalPoints, newStreak);

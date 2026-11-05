@@ -38,6 +38,12 @@ function init(): void {
     capture_dead_clicks: false,
     disable_session_recording: true,
   });
+  // init() only runs once the player has the analytics category on, but PostHog keeps its own
+  // opt-out flag (__ph_opt_in_out_<token>) that persistence.clear() in disablePostHogTracking
+  // doesn't remove. Without this, turning analytics back on after a reject — on a later page
+  // load — would leave PostHog silently dropping every event. Our consent choice is the source
+  // of truth, so bring PostHog's flag in line with it (no $opt_in event for this).
+  if (posthog.has_opted_out_capturing()) posthog.opt_in_capturing({ captureEventName: false });
   loaded = true;
   initialized = true;
 }
