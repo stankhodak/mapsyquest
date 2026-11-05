@@ -29,7 +29,7 @@
     "@types/react-dom": "^19.2.7",
     "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/ui": "^5.0.0",
+    "@vitest/ui": "^5.1.0",
     "all-the-cities": "^3.1.0",
     "country-flag-icons": "^1.6.20",
     "jsdom": "^30.0.1",
@@ -40,7 +40,7 @@
     "topojson-simplify": "^3.0.3",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.0",
+    "vitest": "^5.1.0",
     "world-atlas": "^2.0.2",
     "world-countries": "^5.1.0"
   }
