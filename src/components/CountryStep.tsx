@@ -71,12 +71,14 @@ export function CountryStep({
   // Hard rule: never autofocus on mobile. Focusing an input there pops the keyboard
   // and yanks the page into a scroll-jump the instant a new round/step opens, before
   // the player has even seen the map — matches the app's own md: breakpoint for
-  // "desktop" elsewhere. Desktop keeps the convenience of landing ready to type.
+  // "desktop" elsewhere. Desktop keeps the convenience of landing ready to type,
+  // both when the step opens and when the input unlocks again after a wrong guess
+  // (it's disabled during the feedback pause, which drops focus).
   useEffect(() => {
-    if (window.matchMedia('(min-width: 768px)').matches) {
+    if (!locked && window.matchMedia('(min-width: 768px)').matches) {
       inputRef.current?.focus();
     }
-  }, []);
+  }, [locked]);
 
   useEffect(() => {
     onStateChange?.(stepState);
