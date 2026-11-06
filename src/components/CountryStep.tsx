@@ -64,6 +64,8 @@ export function CountryStep({
   const [locked, setLocked] = useState(stepState.result !== null);
   const [feedback, setFeedback] = useState<Feedback | null>(() => feedbackFor(stepState.result));
   const [showPickHint, setShowPickHint] = useState(false);
+  /** Suggestion highlighted with the arrow keys; -1 when none is. */
+  const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Hard rule: never autofocus on mobile. Focusing an input there pops the keyboard
@@ -138,6 +140,7 @@ export function CountryStep({
       window.setTimeout(() => {
         setTryNumber((t) => t + 1);
         setQuery('');
+        setActiveIndex(-1);
         setLocked(false);
         setFeedback(null);
       }, FEEDBACK_DELAY_MS);
@@ -212,21 +215,31 @@ export function CountryStep({
           onChange={(e) => {
             setQuery(e.target.value);
             setShowPickHint(false);
+            setActiveIndex(-1);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') submit(query);
+            if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && matches.length > 0 && !locked) {
+              e.preventDefault();
+              const step = e.key === 'ArrowDown' ? 1 : -1;
+              setActiveIndex((i) => (i < 0 && step < 0 ? matches.length - 1 : (i + step + matches.length) % matches.length));
+              return;
+            }
+            if (e.key === 'Escape') setActiveIndex(-1);
+            if (e.key === 'Enter') submit(matches[activeIndex]?.name ?? query);
           }}
           placeholder="Type a country name..."
           className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
         />
         {matches.length > 0 && !locked && (
           <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-slate-600 bg-slate-800 shadow-lg">
-            {matches.map((c) => (
+            {matches.map((c, i) => (
               <li key={c.id}>
                 <button
                   type="button"
                   onClick={() => submit(c.name)}
-                  className="block w-full px-4 py-2 text-left text-slate-100 hover:bg-slate-700"
+                  className={`block w-full px-4 py-2 text-left text-slate-100 hover:bg-slate-700 ${
+                    i === activeIndex ? 'bg-slate-700' : ''
+                  }`}
                 >
                   {c.name}
                 </button>

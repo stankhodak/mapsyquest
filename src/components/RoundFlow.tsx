@@ -91,6 +91,23 @@ export function RoundFlow({
     onRoundComplete({ country, countryGuess, capitalGuess, flagGuess, stars, points: roundPoints, tiers });
   }
 
+  // Enter on the between-rounds summary works like "Next round". Not on the last
+  // round's summary, so a stray Enter can't jump straight to the results.
+  const enterAdvances = step === 'summary' && roundNumber < totalRounds;
+  useEffect(() => {
+    if (!enterAdvances) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Enter' || e.repeat) return;
+      // A focused button/input handles Enter itself; don't fire the round twice.
+      if (e.target instanceof HTMLElement && e.target.closest('button, input, textarea, select, a')) return;
+      e.preventDefault();
+      finishRound();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enterAdvances, progress]);
+
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
       {step === 'country' && (
